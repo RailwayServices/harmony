@@ -10,6 +10,7 @@ use twilight_model::http::interaction::{InteractionResponse, InteractionResponse
 use twilight_model::id::Id;
 use twilight_util::builder::InteractionResponseDataBuilder;
 
+#[derive(Clone)]
 pub struct AntinukeCommandHandler {}
 
 impl AntinukeCommandHandler {
@@ -155,6 +156,65 @@ impl AntinukeCommandHandler {
 
         interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
 
+        Ok(())
+    }
+
+    pub async fn handle_prefix(
+        &self,
+        ctx: &crate::prefix::PrefixContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), RailwayError> {
+        let guild_id = ctx.guild_id.get() as i64;
+        let args = &ctx.args;
+
+        if args.is_empty() {
+            return ctx
+                .reply("Available commands: `enable`, `disable`, `settings`, `limit`, `whitelist`")
+                .await;
+        }
+
+        let subcommand = args[0].to_lowercase();
+        let reply_msg = match subcommand.as_str() {
+            "enable" => self.handle_enable(guild_id, module_ctx).await?,
+            "disable" => self.handle_disable(guild_id, module_ctx).await?,
+            "settings" => self.handle_settings(guild_id, module_ctx).await?,
+            "limit" => {
+                let action = args.get(1).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
+                let threshold = args.get(2).and_then(|s| s.parse::<i32>().ok()).unwrap_or(3);
+                let window = args.get(3).and_then(|s| s.parse::<i32>().ok()).unwrap_or(10);
+                let punishment = args.get(4).cloned().unwrap_or_else(|| "BAN".to_string());
+                self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
+                    .await?
+            }
+            "whitelist" => {
+                let sub = args.get(1).map(|s| s.to_lowercase());
+                let target = args.get(2).and_then(|s| {
+                    let cleaned = s.replace("<@", "").replace(">", "").replace("!", "");
+                    cleaned.parse::<u64>().ok()
+                });
+
+                if let (Some(sub), Some(uid)) = (sub, target) {
+                    if sub == "add" {
+                        self.handle_whitelist_add(
+                            guild_id,
+                            uid as i64,
+                            ctx.message.author.id.get() as i64,
+                            module_ctx,
+                        )
+                        .await?
+                    } else if sub == "remove" {
+                        self.handle_whitelist_remove(guild_id, uid as i64, module_ctx).await?
+                    } else {
+                        "Unknown whitelist subcommand".to_string()
+                    }
+                } else {
+                    "Invalid whitelist arguments. Use: `whitelist add @user` or `whitelist remove @user`".to_string()
+                }
+            }
+            _ => "Unknown antinuke command.".to_string(),
+        };
+
+        ctx.reply(&reply_msg).await?;
         Ok(())
     }
 

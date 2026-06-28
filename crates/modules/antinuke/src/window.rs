@@ -35,10 +35,7 @@ pub struct ActionWindow {
 impl ActionWindow {
     #[must_use]
     pub fn new(window_secs: u32) -> Self {
-        Self {
-            timestamps: VecDeque::with_capacity(32),
-            window_ms: u64::from(window_secs) * 1_000,
-        }
+        Self { timestamps: VecDeque::with_capacity(32), window_ms: u64::from(window_secs) * 1_000 }
     }
 
     pub fn push_and_count(&mut self, now_ms: u64) -> usize {

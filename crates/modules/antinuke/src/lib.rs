@@ -12,7 +12,7 @@ use railway_common::error::RailwayError;
 use railway_common::event::RailwayEvent;
 use railway_common::module::Module;
 use railway_database::pool::Database;
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::sync::Arc;
 use tracing::{debug, warn};
 use twilight_http::request::AuditLogReason;
@@ -21,10 +21,7 @@ use twilight_model::id::Id;
 
 static ENGINE: Lazy<engine::AntiNukeEngine> = Lazy::new(engine::AntiNukeEngine::new);
 
-static BOT_USER_ID: AtomicU64 = AtomicU64::new(0);
-
 static OWNER_CACHE: Lazy<dashmap::DashMap<u64, u64>> = Lazy::new(dashmap::DashMap::new);
-
 
 pub async fn reload_guild_config(pool: &sqlx::PgPool, guild_id: u64) {
     let repo =
@@ -72,10 +69,9 @@ pub fn whitelist_remove(guild_id: u64, user_id: u64) {
     ENGINE.whitelist_remove(guild_id, user_id);
 }
 
-
 #[inline]
 fn is_bot(user_id: u64) -> bool {
-    let cached = BOT_USER_ID.load(Ordering::Relaxed);
+    let cached = railway_common::ids::get_bot_id();
     cached != 0 && cached == user_id
 }
 
@@ -157,7 +153,6 @@ fn restore_resource(http: &Arc<HttpClient>, guild_id: u64, resource_type: &str, 
     }
 }
 
-
 pub struct AntinukeModule {
     http: Arc<HttpClient>,
     db: Database,
@@ -190,10 +185,10 @@ impl Module for AntinukeModule {
 
                         OWNER_CACHE.insert(guild_id, guild.owner_id.get());
 
-                        if BOT_USER_ID.load(Ordering::Relaxed) == 0 {
+                        if railway_common::ids::get_bot_id() == 0 {
                             if let Ok(resp) = self.http.current_user().await {
                                 if let Ok(me) = resp.model().await {
-                                    BOT_USER_ID.store(me.id.get(), Ordering::Relaxed);
+                                    railway_common::ids::set_bot_id(me.id.get());
                                     ENGINE.whitelist_add(guild_id, me.id.get());
                                 }
                             }

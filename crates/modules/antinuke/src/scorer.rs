@@ -87,14 +87,8 @@ pub fn resolve_punishment(
 
 #[must_use]
 pub fn has_dangerous_perm_grant(old_perms: u64, new_perms: u64) -> bool {
-    const DANGEROUS: u64 = (1 << 3)  |
-        (1 << 1)  |
-        (1 << 2)  |
-        (1 << 5)  |
-        (1 << 28) |
-        (1 << 4)  |
-        (1 << 29) |
-        (1 << 13);
+    const DANGEROUS: u64 =
+        (1 << 3) | (1 << 1) | (1 << 2) | (1 << 5) | (1 << 28) | (1 << 4) | (1 << 29) | (1 << 13);
     let added = new_perms & !old_perms;
     added & DANGEROUS != 0
 }

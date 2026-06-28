@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub discord_token: String,
     pub database_url: String,
     pub redis_url: String,
+    pub prefix: String,
 }
 
 impl AppConfig {
@@ -18,6 +19,9 @@ impl AppConfig {
         let redis_url = env::var("REDIS_URL")
             .map_err(|_| RailwayError::Config("REDIS_URL not set".to_string()))?;
 
-        Ok(Self { discord_token, database_url, redis_url })
+        let prefix =
+            env::var("PREFIX").map_err(|_| RailwayError::Config("PREFIX not set".to_string()))?;
+
+        Ok(Self { discord_token, database_url, redis_url, prefix })
     }
 }

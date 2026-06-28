@@ -1,3 +1,4 @@
+use railway_commands::router::CommandRouter;
 use railway_common::config::AppConfig;
 use railway_common::error::RailwayError;
 use railway_common::module::ModuleContext;
@@ -8,7 +9,6 @@ use railway_gateway::shard_manager::ShardManager;
 use railway_messaging::subscriber::Subscriber;
 use railway_messaging::transport::local_transport::LocalTransport;
 use railway_modules_registry::ModuleRegistry;
-use railway_commands::router::CommandRouter;
 use std::sync::Arc;
 use tokio::signal;
 use tracing::{error, info};
@@ -51,7 +51,7 @@ async fn main() -> Result<(), RailwayError> {
         }
     });
 
-    let command_router = Arc::new(CommandRouter::new());
+    let command_router = Arc::new(CommandRouter::new(config.prefix.clone()));
     let mut cmd_rx = local_transport.subscribe().await?;
     let cmd_ctx = module_ctx.clone();
 
