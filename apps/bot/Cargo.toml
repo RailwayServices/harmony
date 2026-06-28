@@ -1,0 +1,19 @@
+[package]
+name = "railway-bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+railway-common = { path = "../../crates/common" }
+railway-database = { path = "../../crates/database" }
+railway-cache = { path = "../../crates/cache" }
+railway-messaging = { path = "../../crates/messaging" }
+railway-gateway = { path = "../../crates/gateway" }
+railway-modules-registry = { path = "../../crates/modules/registry" }
+railway-commands = { path = "../../crates/commands" }
+tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "signal"] }
+twilight-http = "0.16"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+thiserror = "2"
+redis = "0.27"

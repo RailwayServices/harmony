@@ -1,0 +1,13 @@
+[package]
+name = "railway-database"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+railway-common = { path = "../common" }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros", "uuid", "chrono"] }
+tokio = { version = "1.52", features = ["sync", "macros"] }
+thiserror = "2"
+twilight-model = "0.16"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }

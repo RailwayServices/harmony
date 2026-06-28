@@ -1,0 +1,13 @@
+[package]
+name = "railway-modules-registry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+railway-common = { path = "../../common" }
+railway-antinuke = { path = "../antinuke" }
+railway-automod = { path = "../automod" }
+railway-database = { path = "../../database" }
+twilight-http = "0.16"
+tokio = { version = "1.52", features = ["full"] }
+thiserror = "2"

@@ -1,0 +1,13 @@
+/target/
+**/*.rs.bk
+Cargo.lock
+.env
+.idea/
+.vscode/
+CLAUDE.md
+.DS_Store
+node_modules/
+dist/
+build/
+.sqlx
+.idea

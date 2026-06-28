@@ -1,0 +1,21 @@
+[package]
+name = "railway-antinuke"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+railway-common = { path = "../../common" }
+railway-cache = { path = "../../cache" }
+railway-database = { path = "../../database" }
+tokio = { version = "1.52", features = ["sync"] }
+thiserror = "2"
+tracing = "0.1"
+twilight-model = "0.16"
+twilight-http = "0.16"
+twilight-util = { version = "0.16", features = ["builder"] }
+async-trait = "0.1"
+sqlx = { version = "0.8", features = ["postgres"] }
+dashmap = "6"
+arc-swap = "1"
+memchr = "2"
+once_cell = "1"

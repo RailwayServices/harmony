@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "crates/common",
+    "crates/database",
+    "crates/cache",
+    "crates/messaging",
+    "crates/gateway",
+    "crates/modules/registry",
+    "crates/modules/antinuke",
+    "crates/commands",
+    "apps/bot",
+]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
