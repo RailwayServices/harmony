@@ -394,24 +394,26 @@ impl Module for AntinukeModule {
                                                 &mut redis_clone,
                                             )
                                             .await;
-                                        });
 
-                                        if needs_restore {
-                                            if let Some(target_id) = target {
-                                                let rtype = match act {
-                                                    types::ActionType::ChannelDelete => {
-                                                        Some("channel")
+                                            if needs_restore {
+                                                if let Some(target_id) = target {
+                                                    let rtype = match act {
+                                                        types::ActionType::ChannelDelete => {
+                                                            Some("channel")
+                                                        }
+                                                        types::ActionType::RoleDelete => {
+                                                            Some("role")
+                                                        }
+                                                        _ => None,
+                                                    };
+                                                    if let Some(rt) = rtype {
+                                                        restore_resource(
+                                                            &http, gid_val, rt, target_id,
+                                                        );
                                                     }
-                                                    types::ActionType::RoleDelete => Some("role"),
-                                                    _ => None,
-                                                };
-                                                if let Some(rt) = rtype {
-                                                    restore_resource(
-                                                        &self.http, gid_val, rt, target_id,
-                                                    );
                                                 }
                                             }
-                                        }
+                                        });
                                     }
                                 }
                             }

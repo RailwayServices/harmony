@@ -27,90 +27,80 @@ pub async fn execute(
 
     match result.punishment {
         Punishment::Ban => {
-            let http = Arc::clone(http);
-            let reason = result.reason.clone();
-            tokio::spawn(async move {
-                if let Err(e) = http
-                    .create_ban(t_guild_id, t_user_id)
-                    .delete_message_seconds(0)
-                    .reason(&reason)
-                    .await
-                {
-                    tracing::warn!("[ANTINUKE] Failed to ban {}: {}", user_id, e);
-                } else {
-                    debug!("[ANTINUKE] BANNED user {} in guild {} — {}", user_id, guild_id, reason);
-                }
-            });
+            if let Err(e) = http
+                .create_ban(t_guild_id, t_user_id)
+                .delete_message_seconds(0)
+                .reason(&result.reason)
+                .await
+            {
+                tracing::warn!("[ANTINUKE] Failed to ban {}: {}", user_id, e);
+            } else {
+                debug!(
+                    "[ANTINUKE] BANNED user {} in guild {} — {}",
+                    user_id, guild_id, result.reason
+                );
+            }
         }
         Punishment::Kick => {
-            let http = Arc::clone(http);
-            let reason = result.reason.clone();
-            tokio::spawn(async move {
-                if let Err(e) =
-                    http.remove_guild_member(t_guild_id, t_user_id).reason(&reason).await
-                {
-                    tracing::warn!("[ANTINUKE] Failed to kick {}: {}", user_id, e);
-                } else {
-                    debug!("[ANTINUKE] KICKED user {} in guild {} — {}", user_id, guild_id, reason);
-                }
-            });
+            if let Err(e) =
+                http.remove_guild_member(t_guild_id, t_user_id).reason(&result.reason).await
+            {
+                tracing::warn!("[ANTINUKE] Failed to kick {}: {}", user_id, e);
+            } else {
+                debug!(
+                    "[ANTINUKE] KICKED user {} in guild {} — {}",
+                    user_id, guild_id, result.reason
+                );
+            }
         }
         Punishment::Timeout => {
-            let http = Arc::clone(http);
-            let reason = result.reason.clone();
-            tokio::spawn(async move {
-                if let Ok(until) = twilight_model::util::datetime::Timestamp::from_secs(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs() as i64
-                        + (30 * 60),
-                ) {
-                    let _ = http
-                        .update_guild_member(t_guild_id, t_user_id)
-                        .communication_disabled_until(Some(until))
-                        .reason(&reason)
-                        .await;
-                    debug!("[ANTINUKE] TIMED OUT user {} in guild {}", user_id, guild_id);
-                }
-            });
+            if let Ok(until) = twilight_model::util::datetime::Timestamp::from_secs(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64
+                    + (30 * 60),
+            ) {
+                let _ = http
+                    .update_guild_member(t_guild_id, t_user_id)
+                    .communication_disabled_until(Some(until))
+                    .reason(&result.reason)
+                    .await;
+                debug!("[ANTINUKE] TIMED OUT user {} in guild {}", user_id, guild_id);
+            }
         }
         Punishment::StripRoles => {
-            let http = Arc::clone(http);
-            let reason = result.reason.clone();
-            tokio::spawn(async move {
-                if let Ok(resp) = http.guild_member(t_guild_id, t_user_id).await {
-                    if let Ok(member) = resp.model().await {
-                        if let Ok(resp) = http.roles(t_guild_id).await {
-                            if let Ok(roles) = resp.model().await {
-                                let keep: Vec<_> = member
-                                    .roles
-                                    .iter()
-                                    .filter(|&&rid| {
-                                        roles
-                                            .iter()
-                                            .find(|r| r.id == rid)
-                                            .map(|r| {
-                                                !super::scorer::has_dangerous_perm_grant(
-                                                    0,
-                                                    r.permissions.bits(),
-                                                )
-                                            })
-                                            .unwrap_or(true)
-                                    })
-                                    .copied()
-                                    .collect();
-                                let _ = http
-                                    .update_guild_member(t_guild_id, t_user_id)
-                                    .roles(&keep)
-                                    .reason(&reason)
-                                    .await;
-                            }
+            if let Ok(resp) = http.guild_member(t_guild_id, t_user_id).await {
+                if let Ok(member) = resp.model().await {
+                    if let Ok(resp) = http.roles(t_guild_id).await {
+                        if let Ok(roles) = resp.model().await {
+                            let keep: Vec<_> = member
+                                .roles
+                                .iter()
+                                .filter(|&&rid| {
+                                    roles
+                                        .iter()
+                                        .find(|r| r.id == rid)
+                                        .map(|r| {
+                                            !super::scorer::has_dangerous_perm_grant(
+                                                0,
+                                                r.permissions.bits(),
+                                            )
+                                        })
+                                        .unwrap_or(true)
+                                })
+                                .copied()
+                                .collect();
+                            let _ = http
+                                .update_guild_member(t_guild_id, t_user_id)
+                                .roles(&keep)
+                                .reason(&result.reason)
+                                .await;
                         }
                     }
                 }
-                debug!("[ANTINUKE] STRIPPED ROLES from user {} in guild {}", user_id, guild_id);
-            });
+            }
+            debug!("[ANTINUKE] STRIPPED ROLES from user {} in guild {}", user_id, guild_id);
         }
         Punishment::LogOnly | Punishment::None => {}
     }
