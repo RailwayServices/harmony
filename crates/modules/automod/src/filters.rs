@@ -19,7 +19,6 @@ pub async fn process_message(
 
     let rules = AutomodRepository::get_rules(&ctx.db, guild_id.get() as i64).await?;
 
-    // In a real implementation, we'd iterate over rules and check regex/filters
     if rules.is_empty() {
         return Ok(());
     }
@@ -31,6 +30,5 @@ pub async fn process_message_update(
     _ctx: Arc<ModuleContext>,
     _msg: &MessageUpdate,
 ) -> Result<(), RailwayError> {
-    // Similar to process_message
     Ok(())
 }
