@@ -1,4 +1,5 @@
 use crate::handlers::antinuke_commands::AntinukeCommandHandler;
+use crate::handlers::automod_commands::AutomodCommandHandler;
 use crate::interaction::InteractionContext;
 use crate::prefix::PrefixRouter;
 use railway_common::error::RailwayError;
@@ -6,6 +7,7 @@ use railway_common::module::ModuleContext;
 
 pub struct CommandRouter {
     antinuke_handler: AntinukeCommandHandler,
+    automod_handler: AutomodCommandHandler,
     prefix_router: PrefixRouter,
 }
 
@@ -13,6 +15,7 @@ impl CommandRouter {
     pub fn new(prefix: String) -> Self {
         Self {
             antinuke_handler: AntinukeCommandHandler::new(),
+            automod_handler: AutomodCommandHandler::new(),
             prefix_router: PrefixRouter::new(prefix),
         }
     }
@@ -46,6 +49,7 @@ impl CommandRouter {
 
         match name {
             "antinuke" => self.antinuke_handler.handle(interaction_ctx, module_ctx).await,
+            "automod" => self.automod_handler.handle(interaction_ctx, module_ctx).await,
             _ => Err(RailwayError::Internal(format!("Unknown command: {}", name))),
         }
     }
