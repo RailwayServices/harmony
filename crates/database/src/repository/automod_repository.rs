@@ -20,7 +20,11 @@ impl AutomodRepository {
         Ok(rules)
     }
 
-    pub async fn get_rule(pool: &PgPool, guild_id: i64, trigger_type: i16) -> Result<Option<AutomodRule>, sqlx::Error> {
+    pub async fn get_rule(
+        pool: &PgPool,
+        guild_id: i64,
+        trigger_type: i16,
+    ) -> Result<Option<AutomodRule>, sqlx::Error> {
         let rule = sqlx::query_as!(
             AutomodRule,
             r#"
@@ -77,7 +81,7 @@ impl AutomodRepository {
         )
         .execute(pool)
         .await?;
-        
+
         Ok(())
     }
 }

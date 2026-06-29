@@ -117,7 +117,10 @@ impl AutomodCommandHandler {
             AutomodRepository::update_rule(&module_ctx.db, &rule).await?;
             Ok(format!("Updated punishment for **{:?}** to **{:?}**.", trigger, action))
         } else {
-            Ok(format!("The **{:?}** filter must be enabled first before configuring punishment.", trigger))
+            Ok(format!(
+                "The **{:?}** filter must be enabled first before configuring punishment.",
+                trigger
+            ))
         }
     }
 }
