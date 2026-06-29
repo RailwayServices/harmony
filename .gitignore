@@ -1,6 +1,5 @@
 /target/
 **/*.rs.bk
-Cargo.lock
 .env
 .idea/
 .vscode/
@@ -9,5 +8,4 @@ CLAUDE.md
 node_modules/
 dist/
 build/
-.sqlx
 .idea
