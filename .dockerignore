@@ -4,4 +4,4 @@ target/
 .env
 .github/
 **/*.rs.bk
-# Note: We do NOT ignore Cargo.lock because it's needed for deterministic builds.
+rust-toolchain.toml
