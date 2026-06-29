@@ -48,6 +48,10 @@ async fn main() -> Result<(), RailwayError> {
     let db_wrapper = Database::connect(&config.database_url).await?;
     let db = db_wrapper.pool.clone();
 
+    info!("[POSTGRES] Running database migrations...");
+    sqlx::migrate!("../../migrations").run(&db).await?;
+    info!("[POSTGRES] Migrations complete.");
+
     info!("[REDIS] Connecting to server: {}", sanitize_redis_url(&config.redis_url));
     let redis_client =
         redis::Client::open(config.redis_url.clone()).map_err(RailwayError::Cache)?;
