@@ -10,9 +10,10 @@ railway-database = { path = "../../database" }
 tokio = { version = "1.52", features = ["sync"] }
 thiserror = "2"
 tracing = "0.1"
-twilight-model = "0.16"
-twilight-http = "0.16"
-twilight-util = { version = "0.16", features = ["builder"] }
+twilight-model = "0.17"
+twilight-http = "0.17"
+redis = { version = "0.27", features = ["tokio-comp"] }
+twilight-util = { version = "0.17", features = ["builder"] }
 async-trait = "0.1"
 sqlx = { version = "0.8", features = ["postgres"] }
 dashmap = "6"

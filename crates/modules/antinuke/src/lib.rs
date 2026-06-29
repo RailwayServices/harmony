@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 pub mod content;
 pub mod engine;
 pub mod punishment;
@@ -5,7 +6,6 @@ pub mod scorer;
 pub mod snapshot;
 pub mod types;
 pub mod whitelist;
-pub mod window;
 
 use once_cell::sync::Lazy;
 use railway_common::error::RailwayError;
@@ -286,9 +286,17 @@ impl Module for AntinukeModule {
                         }
                         let matches =
                             ENGINE.scan_content(gid.get(), ev.author.id.get(), &ev.content, &[]);
+                        let mut cache = _ctx.cache.clone();
                         for m in matches {
-                            if let Some(result) =
-                                ENGINE.process_event(gid.get(), ev.author.id.get(), m.module, None)
+                            if let Some(result) = ENGINE
+                                .process_event(
+                                    gid.get(),
+                                    ev.author.id.get(),
+                                    m.module,
+                                    None,
+                                    &mut cache,
+                                )
+                                .await
                             {
                                 if result.triggered {
                                     let _ = punishment::execute(
@@ -298,6 +306,7 @@ impl Module for AntinukeModule {
                                         gid.get(),
                                         ev.author.id.get(),
                                         &result,
+                                        &mut cache,
                                     )
                                     .await;
                                 }
@@ -363,7 +372,9 @@ impl Module for AntinukeModule {
                                     return Ok(());
                                 }
 
-                                if let Some(result) = ENGINE.process_event(gid_val, uid, act, None)
+                                let mut cache = _ctx.cache.clone();
+                                if let Some(result) =
+                                    ENGINE.process_event(gid_val, uid, act, None, &mut cache).await
                                 {
                                     if result.triggered {
                                         let needs_restore = result.should_restore;
@@ -371,9 +382,16 @@ impl Module for AntinukeModule {
 
                                         let http = self.http.clone();
                                         let db = self.db.clone();
+                                        let mut redis_clone = _ctx.cache.clone();
                                         tokio::spawn(async move {
                                             let _ = punishment::execute(
-                                                &ENGINE, &http, &db, gid_val, uid, &result,
+                                                &ENGINE,
+                                                &http,
+                                                &db,
+                                                gid_val,
+                                                uid,
+                                                &result,
+                                                &mut redis_clone,
                                             )
                                             .await;
                                         });

@@ -1,13 +1,12 @@
 use crate::error::RailwayError;
 use crate::event::RailwayEvent;
-use redis::Client as RedisClient;
 use sqlx::PgPool;
 use std::sync::Arc;
 use twilight_http::Client as DiscordClient;
 
 pub struct ModuleContext {
     pub db: PgPool,
-    pub cache: RedisClient,
+    pub cache: redis::aio::MultiplexedConnection,
     pub discord: Arc<DiscordClient>,
 }
 

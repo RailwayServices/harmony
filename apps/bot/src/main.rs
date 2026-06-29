@@ -16,6 +16,7 @@ use twilight_http::Client as DiscordClient;
 
 #[tokio::main]
 async fn main() -> Result<(), RailwayError> {
+    rustls::crypto::ring::default_provider().install_default().ok();
     tracing_subscriber::fmt::init();
     info!("Starting Railway bot process...");
 
@@ -26,7 +27,10 @@ async fn main() -> Result<(), RailwayError> {
     let db = db_wrapper.pool.clone();
 
     info!("Connecting to Redis...");
-    let cache = redis::Client::open(config.redis_url.clone()).map_err(RailwayError::Cache)?;
+    let redis_client =
+        redis::Client::open(config.redis_url.clone()).map_err(RailwayError::Cache)?;
+    let cache =
+        redis_client.get_multiplexed_async_connection().await.map_err(RailwayError::Cache)?;
 
     let discord = Arc::new(DiscordClient::new(config.discord_token.clone()));
 
@@ -45,9 +49,13 @@ async fn main() -> Result<(), RailwayError> {
     tokio::spawn(async move {
         info!("Module registry listening for events...");
         while let Ok(event) = rx.recv().await {
-            if let Err(e) = registry.handle_event(&event, &registry_ctx).await {
-                error!("Module registry failed to handle event: {}", e);
-            }
+            let registry = registry.clone();
+            let registry_ctx = registry_ctx.clone();
+            tokio::spawn(async move {
+                if let Err(e) = registry.handle_event(&event, &registry_ctx).await {
+                    error!("Module registry failed to handle event: {}", e);
+                }
+            });
         }
     });
 
@@ -58,14 +66,19 @@ async fn main() -> Result<(), RailwayError> {
     tokio::spawn(async move {
         info!("Command Router listening for events...");
         while let Ok(event) = cmd_rx.recv().await {
-            if let Err(e) = command_router.handle_event(&event, &cmd_ctx).await {
-                error!("Command Router failed to handle event: {}", e);
-            }
+            let command_router = command_router.clone();
+            let cmd_ctx = cmd_ctx.clone();
+            tokio::spawn(async move {
+                if let Err(e) = command_router.handle_event(&event, &cmd_ctx).await {
+                    error!("Command Router failed to handle event: {}", e);
+                }
+            });
         }
     });
 
     info!("Initializing Shard Manager...");
-    let shard_manager = ShardManager::new(config.discord_token.clone())?;
+    let shard_manager =
+        ShardManager::new(config.discord_token.clone(), &module_ctx.discord).await?;
     let dispatcher = EventDispatcher::new(local_transport.clone());
     let event_loop = EventLoop::new(shard_manager, dispatcher);
 

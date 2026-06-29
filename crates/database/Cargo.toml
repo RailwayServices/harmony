@@ -8,6 +8,6 @@ railway-common = { path = "../common" }
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros", "uuid", "chrono"] }
 tokio = { version = "1.52", features = ["sync", "macros"] }
 thiserror = "2"
-twilight-model = "0.16"
+twilight-model = "0.17"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }

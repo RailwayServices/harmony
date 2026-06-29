@@ -1,21 +1,20 @@
 use railway_common::error::RailwayError;
-use twilight_gateway::{Intents, Shard, ShardId};
+use twilight_gateway::{ConfigBuilder, Intents, Shard, ShardId};
+use twilight_http::Client as HttpClient;
 
 pub struct ShardManager {
-    pub shard: Shard,
+    pub shards: Vec<Shard>,
 }
 
 impl ShardManager {
-    pub fn new(token: String) -> Result<Self, RailwayError> {
+    pub async fn new(token: String, http: &HttpClient) -> Result<Self, RailwayError> {
         let intents = Intents::GUILDS
             | Intents::GUILD_MESSAGES
             | Intents::MESSAGE_CONTENT
             | Intents::GUILD_MODERATION
             | Intents::GUILD_MEMBERS;
 
-        let mut config_builder = twilight_gateway::ConfigBuilder::new(token, intents);
-
-        config_builder = config_builder.identify_properties(
+        let base_config = ConfigBuilder::new(token, intents).identify_properties(
             twilight_model::gateway::payload::outgoing::identify::IdentifyProperties::new(
                 "Discord VR",
                 "twilight.rs",
@@ -23,37 +22,48 @@ impl ShardManager {
             ),
         );
 
-        let shard_id = ShardId::ONE;
-        let activity = twilight_model::gateway::presence::Activity {
-            application_id: None,
-            assets: None,
-            buttons: Vec::new(),
-            created_at: None,
-            details: None,
-            emoji: None,
-            flags: None,
-            id: None,
-            instance: None,
-            kind: twilight_model::gateway::presence::ActivityType::Custom,
-            name: "Custom Status".into(),
-            party: None,
-            secrets: None,
-            state: Some(format!("🔗 /help · railway · ✦ cluster {}", shard_id.number())),
-            timestamps: None,
-            url: None,
-        };
+        let shards_iter = twilight_gateway::create_recommended(
+            http,
+            base_config.build(),
+            |shard_id: ShardId, builder: ConfigBuilder| {
+                let activity = twilight_model::gateway::presence::Activity {
+                    application_id: None,
+                    assets: None,
+                    buttons: Vec::new(),
+                    created_at: None,
+                    details: None,
+                    emoji: None,
+                    flags: None,
+                    id: None,
+                    instance: None,
+                    kind: twilight_model::gateway::presence::ActivityType::Custom,
+                    name: "Custom Status".into(),
+                    party: None,
+                    secrets: None,
+                    state: Some(format!("🔗 /help · railway · ✦ cluster {}", shard_id.number())),
+                    timestamps: None,
+                    url: None,
+                };
 
-        let presence = twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload::new(
-            vec![activity],
-            false,
-            None,
-            twilight_model::gateway::presence::Status::Online,
-        ).map_err(|e| RailwayError::Config(e.to_string()))?;
+                let presence = twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload::new(
+                    vec![activity],
+                    false,
+                    None,
+                    twilight_model::gateway::presence::Status::Online,
+                ).ok();
 
-        config_builder = config_builder.presence(presence);
+                if let Some(p) = presence {
+                    builder.presence(p).build()
+                } else {
+                    builder.build()
+                }
+            },
+        )
+        .await
+        .map_err(|e| RailwayError::Internal(format!("Failed to create recommended shards: {}", e)))?;
 
-        let shard = Shard::with_config(shard_id, config_builder.build());
+        let shards: Vec<Shard> = shards_iter.collect();
 
-        Ok(Self { shard })
+        Ok(Self { shards })
     }
 }

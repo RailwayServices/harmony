@@ -39,113 +39,117 @@ impl AntinukeCommandHandler {
 
         let subcommand = &data.options[0];
 
-        let reply_msg =
-            match (subcommand.name.as_str(), &subcommand.value) {
-                ("enable", CommandOptionValue::SubCommand(_)) => {
-                    self.handle_enable(guild_id.get() as i64, module_ctx).await?
-                }
-                ("disable", CommandOptionValue::SubCommand(_)) => {
-                    self.handle_disable(guild_id.get() as i64, module_ctx).await?
-                }
-                ("limit", CommandOptionValue::SubCommand(options)) => {
-                    let action = options
-                        .iter()
-                        .find(|o| o.name == "action")
-                        .and_then(|o| match &o.value {
-                            CommandOptionValue::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| "BAN_ADD".to_string());
+        let reply_msg = match (subcommand.name.as_str(), &subcommand.value) {
+            ("enable", CommandOptionValue::SubCommand(_)) => {
+                self.handle_enable(guild_id.get() as i64, module_ctx).await?
+            }
+            ("disable", CommandOptionValue::SubCommand(_)) => {
+                self.handle_disable(guild_id.get() as i64, module_ctx).await?
+            }
+            ("limit", CommandOptionValue::SubCommand(options)) => {
+                let action = options
+                    .iter()
+                    .find(|o| o.name == "action")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "BAN_ADD".to_string());
 
-                    let threshold = options
-                        .iter()
-                        .find(|o| o.name == "threshold")
-                        .and_then(|o| match &o.value {
-                            CommandOptionValue::Integer(i) => Some(*i as i32),
-                            _ => None,
-                        })
-                        .unwrap_or(3);
+                let threshold = options
+                    .iter()
+                    .find(|o| o.name == "threshold")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::Integer(i) => Some(*i as i32),
+                        _ => None,
+                    })
+                    .unwrap_or(3);
 
-                    let window_secs = options
-                        .iter()
-                        .find(|o| o.name == "window_secs")
-                        .and_then(|o| match &o.value {
-                            CommandOptionValue::Integer(i) => Some(*i as i32),
-                            _ => None,
-                        })
-                        .unwrap_or(10);
+                let window_secs = options
+                    .iter()
+                    .find(|o| o.name == "window_secs")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::Integer(i) => Some(*i as i32),
+                        _ => None,
+                    })
+                    .unwrap_or(10);
 
-                    let punishment = options
-                        .iter()
-                        .find(|o| o.name == "punishment")
-                        .and_then(|o| match &o.value {
-                            CommandOptionValue::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| "BAN".to_string());
+                let punishment = options
+                    .iter()
+                    .find(|o| o.name == "punishment")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "BAN".to_string());
 
-                    self.handle_limit(
-                        guild_id.get() as i64,
-                        action,
-                        threshold,
-                        window_secs,
-                        punishment,
-                        module_ctx,
-                    )
-                    .await?
-                }
-                ("settings", CommandOptionValue::SubCommand(_)) => {
-                    self.handle_settings(guild_id.get() as i64, module_ctx).await?
-                }
-                ("whitelist", CommandOptionValue::SubCommandGroup(group_options)) => {
-                    if group_options.is_empty() {
-                        "Invalid whitelist subcommand".to_string()
-                    } else {
-                        let action_opt = &group_options[0];
-                        match (action_opt.name.as_str(), &action_opt.value) {
-                            ("add", CommandOptionValue::SubCommand(opts)) => {
-                                let user = opts.iter().find(|o| o.name == "user").and_then(|o| {
+                self.handle_limit(
+                    guild_id.get() as i64,
+                    action,
+                    threshold,
+                    window_secs,
+                    punishment,
+                    module_ctx,
+                )
+                .await?
+            }
+            ("settings", CommandOptionValue::SubCommand(_)) => {
+                self.handle_settings(guild_id.get() as i64, module_ctx).await?
+            }
+            ("whitelist", CommandOptionValue::SubCommandGroup(group_options)) => {
+                if group_options.is_empty() {
+                    "Invalid whitelist subcommand".to_string()
+                } else {
+                    let action_opt = &group_options[0];
+                    match (action_opt.name.as_str(), &action_opt.value) {
+                        ("add", CommandOptionValue::SubCommand(opts)) => {
+                            let user =
+                                opts.iter().find(|o| o.name == "user").and_then(|o| {
                                     match &o.value {
                                         CommandOptionValue::User(u) => Some(*u),
                                         _ => None,
                                     }
                                 });
-                                if let Some(uid) = user {
-                                    self.handle_whitelist_add(
-                                        guild_id.get() as i64,
-                                        uid.get() as i64,
-                                        interaction.author_id().unwrap().get() as i64,
-                                        module_ctx,
-                                    )
-                                    .await?
-                                } else {
-                                    "User not found".to_string()
-                                }
+                            if let Some(uid) = user {
+                                let author_id = interaction.author_id().ok_or_else(|| {
+                                    RailwayError::Internal("Interaction has no author".to_string())
+                                })?;
+                                self.handle_whitelist_add(
+                                    guild_id.get() as i64,
+                                    uid.get() as i64,
+                                    author_id.get() as i64,
+                                    module_ctx,
+                                )
+                                .await?
+                            } else {
+                                "User not found".to_string()
                             }
-                            ("remove", CommandOptionValue::SubCommand(opts)) => {
-                                let user = opts.iter().find(|o| o.name == "user").and_then(|o| {
-                                    match &o.value {
-                                        CommandOptionValue::User(u) => Some(*u),
-                                        _ => None,
-                                    }
-                                });
-                                if let Some(uid) = user {
-                                    self.handle_whitelist_remove(
-                                        guild_id.get() as i64,
-                                        uid.get() as i64,
-                                        module_ctx,
-                                    )
-                                    .await?
-                                } else {
-                                    "User not found".to_string()
-                                }
-                            }
-                            _ => "Unknown whitelist subcommand".to_string(),
                         }
+                        ("remove", CommandOptionValue::SubCommand(opts)) => {
+                            let user =
+                                opts.iter().find(|o| o.name == "user").and_then(|o| {
+                                    match &o.value {
+                                        CommandOptionValue::User(u) => Some(*u),
+                                        _ => None,
+                                    }
+                                });
+                            if let Some(uid) = user {
+                                self.handle_whitelist_remove(
+                                    guild_id.get() as i64,
+                                    uid.get() as i64,
+                                    module_ctx,
+                                )
+                                .await?
+                            } else {
+                                "User not found".to_string()
+                            }
+                        }
+                        _ => "Unknown whitelist subcommand".to_string(),
                     }
                 }
-                _ => "Unknown subcommand".to_string(),
-            };
+            }
+            _ => "Unknown subcommand".to_string(),
+        };
 
         let interaction_client = module_ctx.discord.interaction(interaction.application_id);
 

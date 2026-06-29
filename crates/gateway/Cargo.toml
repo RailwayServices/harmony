@@ -6,8 +6,10 @@ edition = "2021"
 [dependencies]
 railway-common = { path = "../common" }
 railway-messaging = { path = "../messaging" }
-twilight-gateway = { version = "0.16", default-features = false, features = ["twilight-http", "simd-json", "rustls-native-roots", "rustls-ring"] }
-twilight-model = "0.16"
+twilight-gateway = { version = "0.17", default-features = false, features = ["twilight-http", "simd-json", "rustls-native-roots"] }
+twilight-model = "0.17"
+twilight-http = "0.17"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "sync"] }
 thiserror = "2"
 tracing = "0.1"

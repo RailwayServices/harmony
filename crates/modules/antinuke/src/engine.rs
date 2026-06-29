@@ -1,7 +1,9 @@
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{
     content::{scan, ContentScanInput},
@@ -9,12 +11,10 @@ use super::{
     snapshot::{ChannelSnap, GuildSnapshot, RoleSnap, SnapshotStore},
     types::{ActionType, ContentMatch, GuildConfig, Punishment, ThreatResult},
     whitelist::WhitelistStore,
-    window::{now_millis_cached, start_clock_ticker, ActionWindow},
 };
 
 struct GuildState {
     config: ArcSwap<GuildConfig>,
-    user_windows: DashMap<u64, HashMap<u8, ActionWindow>>,
     whitelist: HashSet<u64>,
 }
 
@@ -27,7 +27,6 @@ pub struct AntiNukeEngine {
 impl AntiNukeEngine {
     #[must_use]
     pub fn new() -> Self {
-        start_clock_ticker();
         Self {
             guilds: DashMap::new(),
             snapshots: SnapshotStore::new(),
@@ -42,11 +41,7 @@ impl AntiNukeEngine {
         if let Some(state) = self.guilds.get(&guild_id) {
             state.config.store(Arc::new(config));
         } else {
-            let state = GuildState {
-                config: ArcSwap::from_pointee(config),
-                user_windows: DashMap::new(),
-                whitelist,
-            };
+            let state = GuildState { config: ArcSwap::from_pointee(config), whitelist };
             self.guilds.insert(guild_id, state);
         }
     }
@@ -57,18 +52,27 @@ impl AntiNukeEngine {
         self.whitelist_store.remove_guild(guild_id);
     }
 
-    pub fn clear_user(&self, guild_id: u64, user_id: u64) {
-        if let Some(state) = self.guilds.get(&guild_id) {
-            state.user_windows.remove(&user_id);
+    pub async fn clear_user(
+        &self,
+        guild_id: u64,
+        user_id: u64,
+        redis: &mut redis::aio::MultiplexedConnection,
+    ) {
+        let mut pipe = redis::pipe();
+        for action in 0..10 {
+            let key = format!("railway:antinuke:windows:{}:{}:{}", guild_id, user_id, action);
+            pipe.del(key);
         }
+        let _ = pipe.query_async::<()>(redis).await;
     }
 
-    pub fn process_event(
+    pub async fn process_event(
         &self,
         guild_id: u64,
         user_id: u64,
         action: ActionType,
         extra_data: Option<&(u64, u64)>,
+        redis_conn: &mut redis::aio::MultiplexedConnection,
     ) -> Option<ThreatResult> {
         let guild = self.guilds.get(&guild_id)?;
         let config = guild.config.load();
@@ -102,7 +106,8 @@ impl AntiNukeEngine {
             }
         }
 
-        let now_ms = now_millis_cached();
+        let now_ms =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
 
         if action.is_instant() || module_cfg.window_secs == 0 {
             let score = compute_score(action, 1);
@@ -119,12 +124,21 @@ impl AntiNukeEngine {
             });
         }
 
-        let count = {
-            let mut user_windows = guild.user_windows.entry(user_id).or_default();
-            user_windows
-                .entry(action as u8)
-                .or_insert_with(|| ActionWindow::new(module_cfg.window_secs))
-                .push_and_count(now_ms)
+        let key = format!("railway:antinuke:windows:{}:{}:{}", guild_id, user_id, action as u8);
+        let window_ms = (module_cfg.window_secs as u64) * 1000;
+        let cutoff_ms = now_ms.saturating_sub(window_ms);
+
+        let mut pipe = redis::pipe();
+        pipe.cmd("ZREMRANGEBYSCORE").arg(&key).arg(0).arg(cutoff_ms).ignore();
+        pipe.cmd("ZADD").arg(&key).arg(now_ms).arg(now_ms).ignore();
+        pipe.cmd("ZCARD").arg(&key);
+        pipe.cmd("EXPIRE").arg(&key).arg(module_cfg.window_secs).ignore();
+
+        let result: redis::RedisResult<(usize,)> = pipe.query_async(redis_conn).await;
+
+        let count = match result {
+            Ok((c,)) => c,
+            Err(_) => 1,
         };
 
         let mut score = compute_score(action, count);
@@ -189,13 +203,14 @@ impl AntiNukeEngine {
         scan(&input, &config.modules)
     }
 
-    pub fn process_content_match(
+    pub async fn process_content_match(
         &self,
         guild_id: u64,
         user_id: u64,
         module: ActionType,
+        redis_conn: &mut redis::aio::MultiplexedConnection,
     ) -> Option<ThreatResult> {
-        self.process_event(guild_id, user_id, module, None)
+        self.process_event(guild_id, user_id, module, None, redis_conn).await
     }
 
     pub fn set_snapshot(&self, snap: GuildSnapshot) {

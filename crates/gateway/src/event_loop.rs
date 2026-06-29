@@ -3,8 +3,9 @@ use crate::shard_manager::ShardManager;
 use railway_common::error::RailwayError;
 use railway_common::event::RailwayEvent;
 use railway_messaging::publisher::Publisher;
+use std::sync::Arc;
 use tracing::{error, info};
-use twilight_gateway::{EventTypeFlags, StreamExt};
+use twilight_gateway::StreamExt as _;
 
 pub struct EventLoop<P: Publisher> {
     shard_manager: ShardManager,
@@ -15,30 +16,56 @@ impl<P: Publisher> EventLoop<P> {
     pub fn new(shard_manager: ShardManager, dispatcher: EventDispatcher<P>) -> Self {
         Self { shard_manager, dispatcher }
     }
+}
 
-    pub async fn run(mut self) -> Result<(), RailwayError> {
+impl<P: Publisher + 'static> EventLoop<P> {
+    pub async fn run(self) -> Result<(), RailwayError> {
         info!("Starting gateway event loop");
 
-        loop {
-            let event_result = self.shard_manager.shard.next_event(EventTypeFlags::all()).await;
+        let mut join_set = tokio::task::JoinSet::new();
+        let dispatcher = Arc::new(self.dispatcher);
 
-            match event_result {
-                Some(Ok(event)) => {
-                    let railway_event = RailwayEvent::from(event);
-                    if let Err(e) = self.dispatcher.dispatch(railway_event).await {
-                        error!("Failed to dispatch event: {}", e);
+        for mut shard in self.shard_manager.shards {
+            let dispatcher = Arc::clone(&dispatcher);
+            join_set.spawn(async move {
+                let shard_id = shard.id();
+                info!("Starting event loop for shard {}", shard_id.number());
+
+                while let Some(event_result) =
+                    shard.next_event(twilight_gateway::EventTypeFlags::all()).await
+                {
+                    match event_result {
+                        Ok(event) => {
+                            let railway_event = RailwayEvent::from(event);
+                            if let Err(e) = dispatcher.dispatch(railway_event).await {
+                                error!(
+                                    "Failed to dispatch event on shard {}: {}",
+                                    shard_id.number(),
+                                    e
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            error!("Shard {} error: {}", shard_id.number(), e);
+                            if matches!(
+                                e.kind(),
+                                twilight_gateway::error::ReceiveMessageErrorType::Reconnect
+                            ) {
+                                break;
+                            }
+                        }
                     }
                 }
-                Some(Err(e)) => {
-                    error!("Shard error: {}", e);
-                    return Err(RailwayError::Internal(format!("Shard error: {}", e)));
-                }
-                None => {
-                    info!("Shard event stream ended");
-                    break;
-                }
+                info!("Event loop for shard {} ended", shard_id.number());
+            });
+        }
+
+        while let Some(res) = join_set.join_next().await {
+            if let Err(e) = res {
+                error!("Shard task panicked or failed: {}", e);
             }
         }
+
         Ok(())
     }
 }

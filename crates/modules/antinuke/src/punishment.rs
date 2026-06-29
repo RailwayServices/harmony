@@ -2,6 +2,7 @@ use super::{
     engine::AntiNukeEngine,
     types::{Punishment, ThreatResult},
 };
+use railway_common::error::RailwayError;
 use railway_database::pool::Database;
 use std::sync::Arc;
 use tracing::debug;
@@ -19,7 +20,8 @@ pub async fn execute(
     guild_id: u64,
     user_id: u64,
     result: &ThreatResult,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    redis_conn: &mut redis::aio::MultiplexedConnection,
+) -> Result<(), RailwayError> {
     let t_guild_id = Id::<GuildMarker>::new(guild_id);
     let t_user_id = Id::<UserMarker>::new(user_id);
 
@@ -60,7 +62,7 @@ pub async fn execute(
                 if let Ok(until) = twilight_model::util::datetime::Timestamp::from_secs(
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs() as i64
                         + (30 * 60),
                 ) {
@@ -113,7 +115,7 @@ pub async fn execute(
         Punishment::LogOnly | Punishment::None => {}
     }
 
-    engine.clear_user(guild_id, user_id);
+    engine.clear_user(guild_id, user_id, redis_conn).await;
 
     let http = Arc::clone(http);
     let db_pool = db.pool.clone();
@@ -163,7 +165,7 @@ pub async fn execute(
                 let timestamp = twilight_model::util::datetime::Timestamp::from_secs(
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs() as i64,
                 )
                 .ok();
