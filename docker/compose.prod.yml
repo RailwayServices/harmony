@@ -8,15 +8,11 @@ services:
     environment:
       - POSTGRES_USER=waris
       - POSTGRES_DB=postgres
-      # Trust auth is used here to match the local dev environment (no password).
-      # For production, set POSTGRES_PASSWORD and change this to password auth.
       - POSTGRES_HOST_AUTH_METHOD=trust
     ports:
       - "5432:5432"
     volumes:
       - pgdata18:/var/lib/postgresql
-    networks:
-      - railway-network
 
   redis:
     image: redis:8.8.0-alpine
@@ -26,11 +22,8 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
-    networks:
-      - railway-network
 
   bot:
-    # Pulls the pre-built image from GitHub Container Registry
     image: ghcr.io/railwayservices/railway:latest
     container_name: railway-bot
     restart: unless-stopped
@@ -42,13 +35,7 @@ services:
     depends_on:
       - postgres
       - redis
-    networks:
-      - railway-network
 
 volumes:
   pgdata18:
   redisdata:
-
-networks:
-  railway-network:
-    driver: bridge
