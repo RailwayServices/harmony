@@ -67,7 +67,8 @@ async fn main() -> Result<(), RailwayError> {
     info!("[TRANSPORT] Initializing local messaging transport (Buffer: 1024)...");
     let local_transport = Arc::new(LocalTransport::new(1024));
 
-    let module_ctx = Arc::new(ModuleContext { db, cache, discord });
+    let module_ctx =
+        Arc::new(ModuleContext { db, cache, discord, embed_color: config.embed_color });
 
     let registry = Arc::new(ModuleRegistry::new(module_ctx.discord.clone(), db_wrapper.clone()));
     let mut rx = local_transport.subscribe().await?;

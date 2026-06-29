@@ -153,9 +153,21 @@ impl AntinukeCommandHandler {
 
         let interaction_client = module_ctx.discord.interaction(interaction.application_id);
 
+        let embed = railway_common::ui::build_stylish_embed(
+            "AntiNuke Command",
+            &reply_msg,
+            module_ctx.embed_color,
+        );
+        let action_row = railway_common::ui::build_support_action_row();
+
         let response = InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(InteractionResponseDataBuilder::new().content(reply_msg).build()),
+            data: Some(
+                InteractionResponseDataBuilder::new()
+                    .embeds([embed])
+                    .components([action_row])
+                    .build(),
+            ),
         };
 
         interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
@@ -172,9 +184,13 @@ impl AntinukeCommandHandler {
         let args = &ctx.args;
 
         if args.is_empty() {
-            return ctx
-                .reply("Available commands: `enable`, `disable`, `settings`, `limit`, `whitelist`")
-                .await;
+            let embed = railway_common::ui::build_stylish_embed(
+                "AntiNuke Help",
+                "Available commands: `enable`, `disable`, `settings`, `limit`, `whitelist`",
+                module_ctx.embed_color,
+            );
+            let action_row = railway_common::ui::build_support_action_row();
+            return ctx.reply_with_ui(embed, vec![action_row]).await;
         }
 
         let subcommand = args[0].to_lowercase();
@@ -218,7 +234,14 @@ impl AntinukeCommandHandler {
             _ => "Unknown antinuke command.".to_string(),
         };
 
-        ctx.reply(&reply_msg).await?;
+        let embed = railway_common::ui::build_stylish_embed(
+            "AntiNuke Command",
+            &reply_msg,
+            module_ctx.embed_color,
+        );
+        let action_row = railway_common::ui::build_support_action_row();
+
+        ctx.reply_with_ui(embed, vec![action_row]).await?;
         Ok(())
     }
 }

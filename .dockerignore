@@ -1,0 +1,7 @@
+target/
+.git/
+.idea/
+.env
+.github/
+**/*.rs.bk
+# Note: We do NOT ignore Cargo.lock because it's needed for deterministic builds.

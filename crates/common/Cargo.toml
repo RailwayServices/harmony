@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 twilight-model = "0.17"
 twilight-http = { version = "0.17", default-features = false, features = ["simd-json", "rustls-native-roots"] }
+twilight-util = { version = "0.17", features = ["builder"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

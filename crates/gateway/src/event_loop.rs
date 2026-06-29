@@ -47,12 +47,6 @@ impl<P: Publisher + 'static> EventLoop<P> {
                         }
                         Err(e) => {
                             error!("Shard {} error: {}", shard_id.number(), e);
-                            if matches!(
-                                e.kind(),
-                                twilight_gateway::error::ReceiveMessageErrorType::Reconnect
-                            ) {
-                                break;
-                            }
                         }
                     }
                 }

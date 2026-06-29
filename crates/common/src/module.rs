@@ -8,6 +8,7 @@ pub struct ModuleContext {
     pub db: PgPool,
     pub cache: redis::aio::MultiplexedConnection,
     pub discord: Arc<DiscordClient>,
+    pub embed_color: u32,
 }
 
 pub trait Module: Send + Sync {

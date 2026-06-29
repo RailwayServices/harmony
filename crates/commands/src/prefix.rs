@@ -2,6 +2,8 @@ use railway_common::error::RailwayError;
 use railway_common::module::ModuleContext;
 use std::sync::Arc;
 use twilight_http::Client as HttpClient;
+use twilight_model::channel::message::component::Component;
+use twilight_model::channel::message::Embed;
 use twilight_model::channel::Message;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
@@ -16,6 +18,23 @@ pub struct PrefixContext {
 impl PrefixContext {
     pub async fn reply(&self, content: &str) -> Result<(), RailwayError> {
         match self.http.create_message(self.message.channel_id).content(content).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(RailwayError::Internal(e.to_string())),
+        }
+    }
+
+    pub async fn reply_with_ui(
+        &self,
+        embed: Embed,
+        components: Vec<Component>,
+    ) -> Result<(), RailwayError> {
+        match self
+            .http
+            .create_message(self.message.channel_id)
+            .embeds(&[embed])
+            .components(&components)
+            .await
+        {
             Ok(_) => Ok(()),
             Err(e) => Err(RailwayError::Internal(e.to_string())),
         }
