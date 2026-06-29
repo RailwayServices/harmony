@@ -14,19 +14,41 @@ use tokio::signal;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
 
+fn sanitize_postgres_url(url: &str) -> String {
+    if let Some(pos) = url.find('@') {
+        let host_part = &url[pos + 1..];
+        format!("postgresql://*****@{}", host_part)
+    } else {
+        url.to_string()
+    }
+}
+
+fn sanitize_redis_url(url: &str) -> String {
+    if let Some(pos) = url.find("://") {
+        let scheme = &url[..pos + 3];
+        let rest = &url[pos + 3..];
+        if let Some(at_pos) = rest.find('@') {
+            format!("{}*****@{}", scheme, &rest[at_pos + 1..])
+        } else {
+            url.to_string()
+        }
+    } else {
+        url.to_string()
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), RailwayError> {
     rustls::crypto::ring::default_provider().install_default().ok();
     tracing_subscriber::fmt::init();
-    info!("Starting Railway bot process...");
 
     let config = AppConfig::from_env()?;
 
-    info!("Connecting to PostgreSQL...");
+    info!("[POSTGRES] Connecting to database: {}", sanitize_postgres_url(&config.database_url));
     let db_wrapper = Database::connect(&config.database_url).await?;
     let db = db_wrapper.pool.clone();
 
-    info!("Connecting to Redis...");
+    info!("[REDIS] Connecting to server: {}", sanitize_redis_url(&config.redis_url));
     let redis_client =
         redis::Client::open(config.redis_url.clone()).map_err(RailwayError::Cache)?;
     let cache =
@@ -34,10 +56,15 @@ async fn main() -> Result<(), RailwayError> {
 
     let discord = Arc::new(DiscordClient::new(config.discord_token.clone()));
 
-    info!("Registering slash commands...");
-    railway_commands::register::register_global_commands(discord.clone()).await?;
+    let bot_user = discord.current_user().await?.model().await?;
+    let bot_name = bot_user.name.clone();
+    railway_common::ids::set_bot_id(bot_user.id.get());
 
-    info!("Initializing local messaging transport...");
+    info!("[DISCORD] Registering global slash commands...");
+    railway_commands::register::register_global_commands(discord.clone()).await?;
+    info!("[DISCORD] Global slash commands registered successfully");
+
+    info!("[TRANSPORT] Initializing local messaging transport (Buffer: 1024)...");
     let local_transport = Arc::new(LocalTransport::new(1024));
 
     let module_ctx = Arc::new(ModuleContext { db, cache, discord });
@@ -47,13 +74,13 @@ async fn main() -> Result<(), RailwayError> {
     let registry_ctx = module_ctx.clone();
 
     tokio::spawn(async move {
-        info!("Module registry listening for events...");
+        info!("[MODULES] Module registry listening for events...");
         while let Ok(event) = rx.recv().await {
             let registry = registry.clone();
             let registry_ctx = registry_ctx.clone();
             tokio::spawn(async move {
                 if let Err(e) = registry.handle_event(&event, &registry_ctx).await {
-                    error!("Module registry failed to handle event: {}", e);
+                    error!("[MODULES] Failed to handle event: {}", e);
                 }
             });
         }
@@ -64,19 +91,19 @@ async fn main() -> Result<(), RailwayError> {
     let cmd_ctx = module_ctx.clone();
 
     tokio::spawn(async move {
-        info!("Command Router listening for events...");
+        info!("[COMMANDS] Router listening for events...");
         while let Ok(event) = cmd_rx.recv().await {
             let command_router = command_router.clone();
             let cmd_ctx = cmd_ctx.clone();
             tokio::spawn(async move {
                 if let Err(e) = command_router.handle_event(&event, &cmd_ctx).await {
-                    error!("Command Router failed to handle event: {}", e);
+                    error!("[COMMANDS] Router failed to handle event: {}", e);
                 }
             });
         }
     });
 
-    info!("Initializing Shard Manager...");
+    info!("[GATEWAY] Initializing Shard Manager with recommended sharding...");
     let shard_manager =
         ShardManager::new(config.discord_token.clone(), &module_ctx.discord).await?;
     let dispatcher = EventDispatcher::new(local_transport.clone());
@@ -84,15 +111,17 @@ async fn main() -> Result<(), RailwayError> {
 
     tokio::spawn(async move {
         if let Err(e) = event_loop.run().await {
-            error!("Gateway event loop crashed: {}", e);
+            error!("[GATEWAY] Gateway event loop crashed: {}", e);
         }
     });
 
-    info!("Railway is fully operational. Waiting for SIGINT...");
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+    info!("[SYSTEM] Connected to Discord as {}", bot_name);
+    info!("[SYSTEM] Waiting for shutdown signal...");
 
     match signal::ctrl_c().await {
-        Ok(()) => info!("Shutdown signal received. Exiting gracefully..."),
-        Err(err) => error!("Unable to listen for shutdown signal: {}", err),
+        Ok(()) => info!("[SYSTEM] Shutdown signal received. Exiting gracefully..."),
+        Err(err) => error!("[SYSTEM] Unable to listen for shutdown signal: {}", err),
     }
 
     Ok(())
