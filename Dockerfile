@@ -1,4 +1,4 @@
-FROM rust:1.79-slim-bookworm AS chef
+FROM rust:slim-bookworm AS chef
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -19,6 +19,7 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin railway-bot
 
 FROM debian:bookworm-slim AS runtime
