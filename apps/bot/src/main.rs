@@ -49,7 +49,10 @@ async fn main() -> Result<(), RailwayError> {
     let db = db_wrapper.pool.clone();
 
     info!("[POSTGRES] Running database migrations...");
-    sqlx::migrate!("../../migrations").run(&db).await?;
+    db_wrapper.run_migrations().await.map_err(|e| {
+        error!("[POSTGRES] Failed to run migrations: {}", e);
+        RailwayError::Database(e)
+    })?;
     info!("[POSTGRES] Migrations complete.");
 
     info!("[REDIS] Connecting to server: {}", sanitize_redis_url(&config.redis_url));
