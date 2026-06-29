@@ -9,7 +9,7 @@ use tracing::debug;
 use twilight_http::request::AuditLogReason;
 use twilight_http::Client as HttpClient;
 use twilight_model::id::{
-    marker::{GuildMarker, UserMarker},
+    marker::{GuildMarker, RoleMarker, UserMarker},
     Id,
 };
 
@@ -70,49 +70,77 @@ pub async fn execute(
             }
         }
         Punishment::StripRoles => {
-            if let Ok(resp) = http.guild_member(t_guild_id, t_user_id).await {
-                if let Ok(member) = resp.model().await {
-                    if let Ok(resp) = http.roles(t_guild_id).await {
-                        if let Ok(roles) = resp.model().await {
-                            let keep: Vec<_> = member
-                                .roles
-                                .iter()
-                                .filter(|&&rid| {
-                                    roles
-                                        .iter()
-                                        .find(|r| r.id == rid)
-                                        .map(|r| {
-                                            !super::scorer::has_dangerous_perm_grant(
-                                                0,
-                                                r.permissions.bits(),
-                                            )
-                                        })
-                                        .unwrap_or(true)
-                                })
-                                .copied()
-                                .collect();
-                            let _ = http
-                                .update_guild_member(t_guild_id, t_user_id)
-                                .roles(&keep)
-                                .reason(&result.reason)
-                                .await;
+            if let Some(cached_roles) = engine.get_member_roles(guild_id, user_id) {
+                let keep: Vec<Id<RoleMarker>> = cached_roles
+                    .iter()
+                    .filter(|&&rid| {
+                        !super::scorer::has_dangerous_perm_grant(
+                            0,
+                            engine.get_role_perms(guild_id, rid),
+                        )
+                    })
+                    .map(|&rid| Id::<RoleMarker>::new(rid))
+                    .collect();
+
+                if let Err(e) = http
+                    .update_guild_member(t_guild_id, t_user_id)
+                    .roles(&keep)
+                    .reason(&result.reason)
+                    .await
+                {
+                    tracing::warn!("[ANTINUKE] Failed to strip roles from {}: {}", user_id, e);
+                } else {
+                    debug!("[ANTINUKE] STRIPPED ROLES from user {} in guild {}", user_id, guild_id);
+                }
+            } else {
+                if let Ok(resp) = http.guild_member(t_guild_id, t_user_id).await {
+                    if let Ok(member) = resp.model().await {
+                        if let Ok(resp) = http.roles(t_guild_id).await {
+                            if let Ok(roles) = resp.model().await {
+                                let keep: Vec<_> = member
+                                    .roles
+                                    .iter()
+                                    .filter(|&&rid| {
+                                        roles
+                                            .iter()
+                                            .find(|r| r.id == rid)
+                                            .map(|r| {
+                                                !super::scorer::has_dangerous_perm_grant(
+                                                    0,
+                                                    r.permissions.bits(),
+                                                )
+                                            })
+                                            .unwrap_or(true)
+                                    })
+                                    .copied()
+                                    .collect();
+                                let _ = http
+                                    .update_guild_member(t_guild_id, t_user_id)
+                                    .roles(&keep)
+                                    .reason(&result.reason)
+                                    .await;
+                            }
                         }
                     }
                 }
+                debug!(
+                    "[ANTINUKE] STRIPPED ROLES from user {} in guild {} (fallback)",
+                    user_id, guild_id
+                );
             }
-            debug!("[ANTINUKE] STRIPPED ROLES from user {} in guild {}", user_id, guild_id);
         }
         Punishment::LogOnly | Punishment::None => {}
     }
 
     engine.clear_user(guild_id, user_id, redis_conn).await;
 
+    let log_channel_id = engine.get_log_channel(guild_id);
+
     let http = Arc::clone(http);
     let db_pool = db.pool.clone();
     let result_clone = result.clone();
 
     tokio::spawn(async move {
-        let db_pool2 = db_pool.clone();
         let action_str = result_clone.action.as_str();
         let punishment_str = result_clone.punishment.as_str();
         let score = result_clone.score as i32;
@@ -131,26 +159,19 @@ pub async fn execute(
                 punishment_str,
                 count
             )
-            .execute(&db_pool2)
+            .execute(&db_pool)
             .await;
         });
 
         let http2 = Arc::clone(&http);
         let discord_fut = tokio::spawn(async move {
-            let log_cfg = sqlx::query_scalar!(
-                r#"SELECT log_channel_id FROM antinuke_guild_config WHERE guild_id = $1"#,
-                guild_id as i64
-            )
-            .fetch_optional(&db_pool)
-            .await;
-
-            if let Ok(Some(Some(log_ch_id))) = log_cfg {
+            if let Some(log_ch_id) = log_channel_id {
                 let title = if result_clone.triggered {
                     "🚨 AntiNuke Triggered!"
                 } else {
                     "🛡️ AntiNuke Action Recovered"
                 };
-                let color = if result_clone.triggered { 0xFF0000 } else { 0x00FF00 };
+                let color = if result_clone.triggered { 0xFF0000_u32 } else { 0x00FF00_u32 };
 
                 let timestamp = twilight_model::util::datetime::Timestamp::from_secs(
                     std::time::SystemTime::now()
@@ -204,8 +225,7 @@ pub async fn execute(
                     embed = embed.timestamp(ts);
                 }
 
-                let _ =
-                    http2.create_message(Id::new(log_ch_id as u64)).embeds(&[embed.build()]).await;
+                let _ = http2.create_message(Id::new(log_ch_id)).embeds(&[embed.build()]).await;
             }
         });
 

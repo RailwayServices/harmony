@@ -189,6 +189,7 @@ pub struct InternalModuleConfig {
 pub struct GuildConfig {
     pub enabled: bool,
     pub modules: HashMap<u8, InternalModuleConfig>,
+    pub log_channel_id: Option<u64>,
 }
 
 #[derive(Debug, Clone)]

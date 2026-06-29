@@ -22,6 +22,7 @@ pub struct AntiNukeEngine {
     guilds: DashMap<u64, GuildState>,
     snapshots: SnapshotStore,
     whitelist_store: WhitelistStore,
+    active_punishments: DashMap<(u64, u64), ()>,
 }
 
 impl AntiNukeEngine {
@@ -31,6 +32,7 @@ impl AntiNukeEngine {
             guilds: DashMap::new(),
             snapshots: SnapshotStore::new(),
             whitelist_store: WhitelistStore::new(),
+            active_punishments: DashMap::new(),
         }
     }
 
@@ -50,6 +52,7 @@ impl AntiNukeEngine {
         self.guilds.remove(&guild_id);
         self.snapshots.remove_guild(guild_id);
         self.whitelist_store.remove_guild(guild_id);
+        self.active_punishments.retain(|k, _| k.0 != guild_id);
     }
 
     pub async fn clear_user(
@@ -58,12 +61,24 @@ impl AntiNukeEngine {
         user_id: u64,
         redis: &mut redis::aio::MultiplexedConnection,
     ) {
+        self.active_punishments.remove(&(guild_id, user_id));
+
         let mut pipe = redis::pipe();
         for action in 0..10 {
             let key = format!("railway:antinuke:windows:{}:{}:{}", guild_id, user_id, action);
             pipe.del(key);
         }
         let _ = pipe.query_async::<()>(redis).await;
+    }
+
+    pub fn try_claim_punishment(&self, guild_id: u64, user_id: u64) -> bool {
+        match self.active_punishments.entry((guild_id, user_id)) {
+            dashmap::mapref::entry::Entry::Occupied(_) => false,
+            dashmap::mapref::entry::Entry::Vacant(v) => {
+                v.insert(());
+                true
+            }
+        }
     }
 
     pub async fn process_event(
@@ -78,10 +93,6 @@ impl AntiNukeEngine {
         let config = guild.config.load();
 
         if !config.enabled {
-            return None;
-        }
-
-        if action.is_content() {
             return None;
         }
 
@@ -218,8 +229,18 @@ impl AntiNukeEngine {
     }
 
     #[must_use]
-    pub fn get_snapshot(&self, guild_id: u64) -> Option<GuildSnapshot> {
-        self.snapshots.get(guild_id)
+    pub fn get_channel_snap(&self, guild_id: u64, channel_id: u64) -> Option<ChannelSnap> {
+        self.snapshots.get_channel(guild_id, channel_id)
+    }
+
+    #[must_use]
+    pub fn get_role_snap(&self, guild_id: u64, role_id: u64) -> Option<RoleSnap> {
+        self.snapshots.get_role(guild_id, role_id)
+    }
+
+    #[must_use]
+    pub fn get_role_perms(&self, guild_id: u64, role_id: u64) -> u64 {
+        self.snapshots.get_role_perms(guild_id, role_id)
     }
 
     pub fn upsert_channel_snap(&self, guild_id: u64, ch: ChannelSnap) {
@@ -236,6 +257,20 @@ impl AntiNukeEngine {
 
     pub fn remove_role_snap(&self, guild_id: u64, role_id: u64) {
         self.snapshots.remove_role(guild_id, role_id);
+    }
+
+    pub fn set_member_roles(&self, guild_id: u64, user_id: u64, roles: Vec<u64>) {
+        self.snapshots.set_member_roles(guild_id, user_id, roles);
+    }
+
+    #[must_use]
+    pub fn get_member_roles(&self, guild_id: u64, user_id: u64) -> Option<Vec<u64>> {
+        self.snapshots.get_member_roles(guild_id, user_id)
+    }
+
+    #[must_use]
+    pub fn get_log_channel(&self, guild_id: u64) -> Option<u64> {
+        self.guilds.get(&guild_id).and_then(|g| g.config.load().log_channel_id)
     }
 
     pub fn whitelist_add(&self, guild_id: u64, user_id: u64) {

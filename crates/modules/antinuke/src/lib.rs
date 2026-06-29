@@ -55,7 +55,11 @@ pub async fn reload_guild_config(pool: &sqlx::PgPool, guild_id: u64) {
         }
     }
 
-    let config = types::GuildConfig { enabled: db_config.enabled, modules };
+    let config = types::GuildConfig {
+        enabled: db_config.enabled,
+        modules,
+        log_channel_id: db_config.log_channel_id.map(|id| id as u64),
+    };
     let whitelists = repo.get_whitelist(guild_id_i64).await.unwrap_or_default();
     ENGINE.configure(guild_id, config, whitelists.into_iter().map(|id| id as u64).collect());
     debug!("[ANTINUKE] Reloaded config for guild {} into engine", guild_id);
@@ -86,71 +90,66 @@ fn should_skip(guild_id: u64, user_id: u64) -> bool {
 }
 
 fn restore_resource(http: &Arc<HttpClient>, guild_id: u64, resource_type: &str, resource_id: u64) {
-    if let Some(snap) = ENGINE.get_snapshot(guild_id) {
-        let http = Arc::clone(http);
-        let t_guild_id = Id::new(guild_id);
-        let resource_type = resource_type.to_string();
+    let http = Arc::clone(http);
+    let resource_type = resource_type.to_string();
+    let t_guild_id = Id::new(guild_id);
 
-        tokio::spawn(async move {
-            match resource_type.as_str() {
-                "channel" => {
-                    if let Some(ch) = snap.channels.iter().find(|c| c.id == resource_id) {
-                        let mut req = http
-                            .create_guild_channel(t_guild_id, &ch.name)
-                            .kind(twilight_model::channel::ChannelType::from(ch.kind))
-                            .position(ch.position as u64)
-                            .nsfw(ch.nsfw)
-                            .rate_limit_per_user(ch.rate_limit_per_user);
-                        if let Some(t) = &ch.topic {
-                            req = req.topic(t);
-                        }
-                        if let Some(pid) = ch.parent_id {
-                            req = req.parent_id(Id::new(pid));
-                        }
-                        match req.reason("[Railway AntiNuke] Auto-restore").await {
-                            Ok(_) => debug!(
-                                "[ANTINUKE] Restored channel '{}' in guild {}",
-                                ch.name, guild_id
-                            ),
-                            Err(e) => {
-                                warn!("[ANTINUKE] Failed to restore channel '{}': {}", ch.name, e)
-                            }
+    tokio::spawn(async move {
+        match resource_type.as_str() {
+            "channel" => {
+                if let Some(ch) = ENGINE.get_channel_snap(guild_id, resource_id) {
+                    let mut req = http
+                        .create_guild_channel(t_guild_id, &ch.name)
+                        .kind(twilight_model::channel::ChannelType::from(ch.kind))
+                        .position(ch.position as u64)
+                        .nsfw(ch.nsfw)
+                        .rate_limit_per_user(ch.rate_limit_per_user);
+                    if let Some(t) = &ch.topic {
+                        req = req.topic(t);
+                    }
+                    if let Some(pid) = ch.parent_id {
+                        req = req.parent_id(Id::new(pid));
+                    }
+                    match req.reason("[Railway AntiNuke] Auto-restore").await {
+                        Ok(_) => debug!(
+                            "[ANTINUKE] Restored channel '{}' in guild {}",
+                            ch.name, guild_id
+                        ),
+                        Err(e) => {
+                            warn!("[ANTINUKE] Failed to restore channel '{}': {}", ch.name, e)
                         }
                     }
                 }
-                "role" => {
-                    if let Some(r) = snap.roles.iter().find(|r| r.id == resource_id) {
-                        if r.name == "@everyone" {
-                            return;
-                        }
-                        match http
-                            .create_role(t_guild_id)
-                            .name(&r.name)
-                            .color(r.color)
-                            .permissions(twilight_model::guild::Permissions::from_bits_truncate(
-                                r.permissions,
-                            ))
-                            .hoist(r.hoist)
-                            .mentionable(r.mentionable)
-                            .reason("[Railway AntiNuke] Auto-restore")
-                            .await
-                        {
-                            Ok(_) => {
-                                debug!(
-                                    "[ANTINUKE] Restored role '{}' in guild {}",
-                                    r.name, guild_id
-                                )
-                            }
-                            Err(e) => {
-                                warn!("[ANTINUKE] Failed to restore role '{}': {}", r.name, e)
-                            }
-                        }
-                    }
-                }
-                _ => {}
             }
-        });
-    }
+            "role" => {
+                if let Some(r) = ENGINE.get_role_snap(guild_id, resource_id) {
+                    if r.name == "@everyone" {
+                        return;
+                    }
+                    match http
+                        .create_role(t_guild_id)
+                        .name(&r.name)
+                        .color(r.color)
+                        .permissions(twilight_model::guild::Permissions::from_bits_truncate(
+                            r.permissions,
+                        ))
+                        .hoist(r.hoist)
+                        .mentionable(r.mentionable)
+                        .reason("[Railway AntiNuke] Auto-restore")
+                        .await
+                    {
+                        Ok(_) => {
+                            debug!("[ANTINUKE] Restored role '{}' in guild {}", r.name, guild_id)
+                        }
+                        Err(e) => {
+                            warn!("[ANTINUKE] Failed to restore role '{}': {}", r.name, e)
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    });
 }
 
 pub struct AntinukeModule {
@@ -230,6 +229,14 @@ impl Module for AntinukeModule {
                             channels,
                             roles,
                         });
+
+                        for member in &guild.members {
+                            ENGINE.set_member_roles(
+                                guild_id,
+                                member.user.id.get(),
+                                member.roles.iter().map(|r| r.get()).collect(),
+                            );
+                        }
                     }
                 }
 
@@ -277,6 +284,22 @@ impl Module for AntinukeModule {
                         mentionable: ev.role.mentionable,
                     };
                     ENGINE.upsert_role_snap(ev.guild_id.get(), snap);
+                }
+
+                twilight_model::gateway::event::Event::MemberAdd(ev) => {
+                    ENGINE.set_member_roles(
+                        ev.guild_id.get(),
+                        ev.user.id.get(),
+                        ev.roles.iter().map(|r| r.get()).collect(),
+                    );
+                }
+
+                twilight_model::gateway::event::Event::MemberUpdate(ev) => {
+                    ENGINE.set_member_roles(
+                        ev.guild_id.get(),
+                        ev.user.id.get(),
+                        ev.roles.iter().map(|r| r.get()).collect(),
+                    );
                 }
 
                 twilight_model::gateway::event::Event::MessageCreate(ev) => {
@@ -377,13 +400,37 @@ impl Module for AntinukeModule {
                                     ENGINE.process_event(gid_val, uid, act, None, &mut cache).await
                                 {
                                     if result.triggered {
+                                        if !ENGINE.try_claim_punishment(gid_val, uid) {
+                                            return Ok(());
+                                        }
+
                                         let needs_restore = result.should_restore;
                                         let target = ev.target_id.map(|t| t.get());
 
                                         let http = self.http.clone();
                                         let db = self.db.clone();
                                         let mut redis_clone = _ctx.cache.clone();
+
                                         tokio::spawn(async move {
+                                            if needs_restore {
+                                                if let Some(target_id) = target {
+                                                    match act {
+                                                        types::ActionType::ChannelDelete => {
+                                                            restore_resource(
+                                                                &http, gid_val, "channel",
+                                                                target_id,
+                                                            );
+                                                        }
+                                                        types::ActionType::RoleDelete => {
+                                                            restore_resource(
+                                                                &http, gid_val, "role", target_id,
+                                                            );
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+                                            }
+
                                             let _ = punishment::execute(
                                                 &ENGINE,
                                                 &http,
@@ -394,25 +441,6 @@ impl Module for AntinukeModule {
                                                 &mut redis_clone,
                                             )
                                             .await;
-
-                                            if needs_restore {
-                                                if let Some(target_id) = target {
-                                                    let rtype = match act {
-                                                        types::ActionType::ChannelDelete => {
-                                                            Some("channel")
-                                                        }
-                                                        types::ActionType::RoleDelete => {
-                                                            Some("role")
-                                                        }
-                                                        _ => None,
-                                                    };
-                                                    if let Some(rt) = rtype {
-                                                        restore_resource(
-                                                            &http, gid_val, rt, target_id,
-                                                        );
-                                                    }
-                                                }
-                                            }
                                         });
                                     }
                                 }
