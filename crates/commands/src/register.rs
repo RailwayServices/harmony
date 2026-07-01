@@ -137,6 +137,7 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
             ))
             .build(),
     )
+    .option(SubCommandBuilder::new("settings", "View current AutoMod settings").build())
     .build();
 
     let commands = vec![antinuke_cmd, automod_cmd];

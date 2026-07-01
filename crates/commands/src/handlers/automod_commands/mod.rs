@@ -81,17 +81,56 @@ impl AutomodCommandHandler {
 
                 self.handle_punishment(guild_id.get() as i64, filter, action, module_ctx).await?
             }
+            ("settings", CommandOptionValue::SubCommand(_)) => {
+                self.handle_settings(guild_id.get() as i64, module_ctx).await?
+            }
             _ => "Unknown subcommand".to_string(),
+        };
+
+        let action_row = if subcommand.name.as_str() == "settings" {
+            let spam =
+                railway_database::repository::automod_repository::AutomodRepository::get_rule(
+                    &module_ctx.db,
+                    guild_id.get() as i64,
+                    1,
+                )
+                .await?
+                .map(|r| r.enabled)
+                .unwrap_or(false);
+            let antilink =
+                railway_database::repository::automod_repository::AutomodRepository::get_rule(
+                    &module_ctx.db,
+                    guild_id.get() as i64,
+                    2,
+                )
+                .await?
+                .map(|r| r.enabled)
+                .unwrap_or(false);
+            let ghostping =
+                railway_database::repository::automod_repository::AutomodRepository::get_rule(
+                    &module_ctx.db,
+                    guild_id.get() as i64,
+                    3,
+                )
+                .await?
+                .map(|r| r.enabled)
+                .unwrap_or(false);
+            railway_common::ui::build_automod_settings_buttons(spam, antilink, ghostping)
+        } else {
+            railway_common::ui::build_support_action_row()
         };
 
         let interaction_client = module_ctx.discord.interaction(interaction.application_id);
 
         let embed = railway_common::ui::build_stylish_embed(
-            "AutoMod Settings",
+            if subcommand.name.as_str() == "settings" {
+                "AutoMod Settings"
+            } else {
+                "AutoMod Command"
+            },
             &reply_msg,
             module_ctx.embed_color,
         );
-        let action_row = railway_common::ui::build_support_action_row();
 
         let response = InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,

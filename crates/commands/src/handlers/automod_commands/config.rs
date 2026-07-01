@@ -123,4 +123,47 @@ impl AutomodCommandHandler {
             ))
         }
     }
+
+    pub async fn handle_settings(
+        &self,
+        guild_id: i64,
+        module_ctx: &ModuleContext,
+    ) -> Result<String, RailwayError> {
+        let spam = AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::Spam as i16)
+            .await
+            .ok()
+            .flatten();
+        let antilink =
+            AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::AntiLink as i16)
+                .await
+                .ok()
+                .flatten();
+        let ghostping =
+            AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::GhostPing as i16)
+                .await
+                .ok()
+                .flatten();
+
+        let format_rule = |rule: &Option<railway_database::models::automod_rule::AutomodRule>| {
+            if let Some(r) = rule {
+                let status = if r.enabled { "🟢 Enabled" } else { "🔴 Disabled" };
+                let action = match ActionType::try_from(r.action_type) {
+                    Ok(ActionType::DeleteMessage) => "Delete Message",
+                    Ok(ActionType::Timeout) => "Timeout (5m)",
+                    Ok(ActionType::DeleteAndTimeout) => "Delete & Timeout",
+                    _ => "Unknown",
+                };
+                format!("{} (Punishment: {})", status, action)
+            } else {
+                "🔴 Disabled (Not configured)".to_string()
+            }
+        };
+
+        Ok(format!(
+            "**AutoMod Settings**\n\n**Spam Filter:** {}\n**Anti-Link (Invites):** {}\n**Ghost Ping:** {}",
+            format_rule(&spam),
+            format_rule(&antilink),
+            format_rule(&ghostping),
+        ))
+    }
 }

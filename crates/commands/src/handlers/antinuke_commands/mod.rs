@@ -151,14 +151,28 @@ impl AntinukeCommandHandler {
             _ => "Unknown subcommand".to_string(),
         };
 
+        let action_row = if subcommand.name.as_str() == "settings" {
+            let repo = railway_database::repository::antinuke_repository::AntinukeRepository::new(
+                module_ctx.db.clone(),
+            );
+            let config = repo.get_config(guild_id.get() as i64).await?;
+            let enabled = config.map(|c| c.enabled).unwrap_or(false);
+            railway_common::ui::build_antinuke_settings_buttons(enabled)
+        } else {
+            railway_common::ui::build_support_action_row()
+        };
+
         let interaction_client = module_ctx.discord.interaction(interaction.application_id);
 
         let embed = railway_common::ui::build_stylish_embed(
-            "AntiNuke Command",
+            if subcommand.name.as_str() == "settings" {
+                "AntiNuke Settings"
+            } else {
+                "AntiNuke Command"
+            },
             &reply_msg,
             module_ctx.embed_color,
         );
-        let action_row = railway_common::ui::build_support_action_row();
 
         let response = InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
@@ -249,5 +263,15 @@ impl AntinukeCommandHandler {
 impl Default for AntinukeCommandHandler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl AntinukeCommandHandler {
+    pub async fn handle_settings_wrapper(
+        &self,
+        guild_id: i64,
+        module_ctx: &ModuleContext,
+    ) -> Result<String, RailwayError> {
+        self.handle_settings(guild_id, module_ctx).await
     }
 }

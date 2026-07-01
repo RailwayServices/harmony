@@ -225,7 +225,19 @@ pub async fn execute(
                     embed = embed.timestamp(ts);
                 }
 
-                let _ = http2.create_message(Id::new(log_ch_id)).embeds(&[embed.build()]).await;
+                let built_embed = embed.build();
+                let embeds = [built_embed];
+                if result_clone.triggered {
+                    let buttons = railway_common::ui::build_antinuke_log_buttons(user_id);
+                    let components = [buttons];
+                    let _ = http2
+                        .create_message(Id::new(log_ch_id))
+                        .embeds(&embeds)
+                        .components(&components)
+                        .await;
+                } else {
+                    let _ = http2.create_message(Id::new(log_ch_id)).embeds(&embeds).await;
+                }
             }
         });
 
