@@ -50,35 +50,19 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
                 StringBuilder::new("action", "The action to set a limit for")
                     .required(true)
                     .choices(vec![
-                        ("Bans", "BAN_ADD"),
-                        ("Kicks", "MEMBER_KICK"),
-                        ("Channel Deletes", "CHANNEL_DELETE"),
-                        ("Role Deletes", "ROLE_DELETE"),
-                        ("Bot Adds", "BOT_ADD"),
-                        ("Mass Mentions", "EVERYONE_PING"),
+                        ("Banning Members", "BAN_ADD"),
+                        ("Kicking Members", "MEMBER_KICK"),
+                        ("Deleting Roles", "ROLE_DELETE"),
+                        ("Creating Roles", "ROLE_CREATE"),
+                        ("Deleting Channels", "CHANNEL_DELETE"),
+                        ("Creating Channels", "CHANNEL_CREATE"),
                     ]),
             )
             .option(
-                IntegerBuilder::new("threshold", "Number of actions allowed (0 = instant)")
+                IntegerBuilder::new("limit", "Number of actions allowed (0 = instant punishment)")
                     .required(true)
                     .min_value(0)
                     .max_value(20),
-            )
-            .option(
-                IntegerBuilder::new("window_secs", "Time window in seconds")
-                    .required(true)
-                    .min_value(1)
-                    .max_value(300),
-            )
-            .option(
-                StringBuilder::new("punishment", "The punishment to apply").required(true).choices(
-                    vec![
-                        ("Ban", "BAN"),
-                        ("Kick", "KICK"),
-                        ("Strip Roles", "STRIP_ROLES"),
-                        ("Timeout (30m)", "TIMEOUT"),
-                    ],
-                ),
             )])
             .build(),
     )
