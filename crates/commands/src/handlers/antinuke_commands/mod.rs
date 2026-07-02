@@ -234,7 +234,7 @@ impl AntinukeCommandHandler {
         if args.is_empty() {
             let embed = railway_common::ui::build_stylish_embed(
                 "AntiNuke Help",
-                "Available commands: `enable`, `disable`, `settings`, `limit`, `whitelist`",
+                "Available commands: `enable`, `disable`, `settings`, `set limit`, `whitelisted`, `whitelist`",
                 module_ctx.embed_color,
             );
             let action_row = railway_common::ui::build_support_action_row();
