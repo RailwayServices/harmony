@@ -4,6 +4,8 @@ use railway_common::error::RailwayError;
 use railway_common::module::ModuleContext;
 use railway_database::models::antinuke_config::{AntinukeConfig, AntinukeModuleConfigRow};
 use railway_database::repository::antinuke_repository::AntinukeRepository;
+use twilight_model::channel::permission_overwrite::{PermissionOverwrite, PermissionOverwriteType};
+use twilight_model::guild::Permissions;
 use twilight_model::id::Id;
 
 impl AntinukeCommandHandler {
@@ -20,10 +22,22 @@ impl AntinukeCommandHandler {
             updated_at: Utc::now(),
         });
 
+        if config.enabled {
+            return Ok("✅ AntiNuke is already enabled for this server.".to_string());
+        }
+
         if config.log_channel_id.is_none() {
+            let everyone_overwrite = PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                id: Id::new(guild_id as u64),
+                kind: PermissionOverwriteType::Role,
+            };
+
             let channel = module_ctx
                 .discord
                 .create_guild_channel(Id::new(guild_id as u64), "railway-logs")
+                .permission_overwrites(&[everyone_overwrite])
                 .await?
                 .model()
                 .await?;
@@ -50,6 +64,15 @@ impl AntinukeCommandHandler {
             log_channel_id: None,
             updated_at: Utc::now(),
         });
+
+        if !config.enabled {
+            return Ok("❌ AntiNuke is already disabled for this server.".to_string());
+        }
+
+        if let Some(channel_id) = config.log_channel_id {
+            let _ = module_ctx.discord.delete_channel(Id::new(channel_id as u64)).await;
+            config.log_channel_id = None;
+        }
 
         config.enabled = false;
         repo.upsert_config(&config).await?;
