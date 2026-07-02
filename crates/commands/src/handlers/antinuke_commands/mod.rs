@@ -3,7 +3,10 @@ use railway_common::error::RailwayError;
 use railway_common::module::ModuleContext;
 use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::InteractionData;
+use twilight_model::guild::Permissions;
 use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType};
+use twilight_model::id::marker::{GuildMarker, UserMarker};
+use twilight_model::id::Id;
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 pub mod config;
@@ -18,6 +21,52 @@ impl AntinukeCommandHandler {
         Self {}
     }
 
+    async fn check_antinuke_permissions(
+        &self,
+        guild_id: Id<GuildMarker>,
+        user_id: Id<UserMarker>,
+        module_ctx: &ModuleContext,
+    ) -> Result<bool, RailwayError> {
+        let guild = module_ctx.discord.guild(guild_id).await?.model().await?;
+
+        if guild.owner_id == user_id {
+            return Ok(true);
+        }
+
+        let user_member = module_ctx.discord.guild_member(guild_id, user_id).await?.model().await?;
+        let bot_id = module_ctx.discord.current_user().await?.model().await?.id;
+        let bot_member = module_ctx.discord.guild_member(guild_id, bot_id).await?.model().await?;
+
+        let mut has_admin = false;
+        let mut user_highest_pos = 0;
+
+        for role_id in user_member.roles {
+            if let Some(role) = guild.roles.iter().find(|r| r.id == role_id) {
+                if role.permissions.contains(Permissions::ADMINISTRATOR) {
+                    has_admin = true;
+                }
+                if role.position > user_highest_pos {
+                    user_highest_pos = role.position;
+                }
+            }
+        }
+
+        if !has_admin {
+            return Ok(false);
+        }
+
+        let mut bot_highest_pos = 0;
+        for role_id in bot_member.roles {
+            if let Some(role) = guild.roles.iter().find(|r| r.id == role_id) {
+                if role.position > bot_highest_pos {
+                    bot_highest_pos = role.position;
+                }
+            }
+        }
+
+        Ok(user_highest_pos > bot_highest_pos)
+    }
+
     pub async fn handle(
         &self,
         interaction_ctx: &InteractionContext,
@@ -27,6 +76,27 @@ impl AntinukeCommandHandler {
         let guild_id = interaction
             .guild_id
             .ok_or_else(|| RailwayError::Internal("Command must be run in a guild".to_string()))?;
+
+        let user_id = interaction
+            .author_id()
+            .ok_or_else(|| RailwayError::Internal("No author".to_string()))?;
+
+        if !self.check_antinuke_permissions(guild_id, user_id, module_ctx).await.unwrap_or(false) {
+            let embed = railway_common::ui::build_stylish_embed(
+                "Permission Denied",
+                "❌ You must be the **Server Owner** OR have **Administrator** permissions with a role **strictly higher** than my highest role to use AntiNuke commands.",
+                module_ctx.embed_color,
+            );
+            let interaction_client = module_ctx.discord.interaction(interaction.application_id);
+            let response = InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseDataBuilder::new().embeds([embed]).build()),
+            };
+            interaction_client
+                .create_response(interaction.id, &interaction.token, &response)
+                .await?;
+            return Ok(());
+        }
 
         let data = match &interaction.data {
             Some(InteractionData::ApplicationCommand(data)) => data,
@@ -230,6 +300,20 @@ impl AntinukeCommandHandler {
     ) -> Result<(), RailwayError> {
         let guild_id = ctx.guild_id.get() as i64;
         let args = &ctx.args;
+
+        if !self
+            .check_antinuke_permissions(ctx.guild_id, ctx.message.author.id, module_ctx)
+            .await
+            .unwrap_or(false)
+        {
+            let embed = railway_common::ui::build_stylish_embed(
+                "Permission Denied",
+                "❌ You must be the **Server Owner** OR have **Administrator** permissions with a role **strictly higher** than my highest role to use AntiNuke commands.",
+                module_ctx.embed_color,
+            );
+            ctx.reply_with_ui(embed, vec![]).await?;
+            return Ok(());
+        }
 
         if args.is_empty() {
             let embed = railway_common::ui::build_stylish_embed(
