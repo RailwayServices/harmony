@@ -111,8 +111,28 @@ impl AntinukeCommandHandler {
                     railway_database::repository::antinuke_repository::AntinukeRepository::new(
                         module_ctx.db.clone(),
                     );
-                let count = repo.get_whitelist_count(guild_id.get() as i64).await.unwrap_or(0);
-                format!("🛡️ There are currently **{}** users whitelisted from AntiNuke.", count)
+                let list = repo.get_whitelist(guild_id.get() as i64).await.unwrap_or_default();
+                let count = list.len();
+
+                if count == 0 {
+                    "🛡️ There are currently **0** users whitelisted from AntiNuke.".to_string()
+                } else {
+                    let mentions: Vec<String> =
+                        list.into_iter().map(|id| format!("<@{}>", id)).collect();
+                    let mut text = format!(
+                        "🛡️ There are currently **{}** users whitelisted from AntiNuke:\n",
+                        count
+                    );
+
+                    let joined = mentions.join(", ");
+                    if joined.len() > 1800 {
+                        text.push_str(&joined[..1800]);
+                        text.push_str("... and more");
+                    } else {
+                        text.push_str(&joined);
+                    }
+                    text
+                }
             }
             ("settings", CommandOptionValue::SubCommand(_)) => {
                 self.handle_settings(guild_id.get() as i64, module_ctx).await?
@@ -251,8 +271,28 @@ impl AntinukeCommandHandler {
                     railway_database::repository::antinuke_repository::AntinukeRepository::new(
                         module_ctx.db.clone(),
                     );
-                let count = repo.get_whitelist_count(guild_id).await.unwrap_or(0);
-                format!("🛡️ There are currently **{}** users whitelisted from AntiNuke.", count)
+                let list = repo.get_whitelist(guild_id).await.unwrap_or_default();
+                let count = list.len();
+
+                if count == 0 {
+                    "🛡️ There are currently **0** users whitelisted from AntiNuke.".to_string()
+                } else {
+                    let mentions: Vec<String> =
+                        list.into_iter().map(|id| format!("<@{}>", id)).collect();
+                    let mut text = format!(
+                        "🛡️ There are currently **{}** users whitelisted from AntiNuke:\n",
+                        count
+                    );
+
+                    let joined = mentions.join(", ");
+                    if joined.len() > 1800 {
+                        text.push_str(&joined[..1800]);
+                        text.push_str("... and more");
+                    } else {
+                        text.push_str(&joined);
+                    }
+                    text
+                }
             }
             "whitelist" => {
                 let sub = args.get(1).map(|s| s.to_lowercase());
