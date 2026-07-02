@@ -259,6 +259,14 @@ impl AntinukeCommandHandler {
                     "Invalid set subcommand. Use: `set limit`".to_string()
                 }
             }
+            "limit" => {
+                let action = args.get(1).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
+                let threshold = args.get(2).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+                let window = 60;
+                let punishment = args.get(3).cloned().unwrap_or_else(|| "BAN".to_string());
+                self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
+                    .await?
+            }
             "whitelisted" => {
                 let repo =
                     railway_database::repository::antinuke_repository::AntinukeRepository::new(
