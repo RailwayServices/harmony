@@ -29,18 +29,6 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
     .option(SubCommandBuilder::new("enable", "Enable antinuke for this server").build())
     .option(SubCommandBuilder::new("disable", "Disable antinuke for this server").build())
     .option(
-        SubCommandBuilder::new("punishment", "Set the default punishment for destructive actions")
-            .option(StringBuilder::new("action", "The action to take").required(true).choices(
-                vec![
-                    ("Ban", "ban"),
-                    ("Kick", "kick"),
-                    ("Strip Roles", "strip_roles"),
-                    ("Timeout (30m)", "timeout"),
-                ],
-            ))
-            .build(),
-    )
-    .option(
         SubCommandGroupBuilder::new("set", "Set configurations for antinuke")
             .subcommands(vec![SubCommandBuilder::new(
                 "limit",
@@ -71,7 +59,6 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
                         ("Ban", "BAN"),
                         ("Kick", "KICK"),
                         ("Strip Roles", "STRIP_ROLES"),
-                        ("Timeout (30m)", "TIMEOUT"),
                     ]),
             )])
             .build(),
