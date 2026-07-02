@@ -46,52 +46,73 @@ impl AntinukeCommandHandler {
             ("disable", CommandOptionValue::SubCommand(_)) => {
                 self.handle_disable(guild_id.get() as i64, module_ctx).await?
             }
-            ("limit", CommandOptionValue::SubCommand(options)) => {
-                let action = options
-                    .iter()
-                    .find(|o| o.name == "action")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "BAN_ADD".to_string());
+            ("set", CommandOptionValue::SubCommandGroup(group_options)) => {
+                if group_options.is_empty() {
+                    "Invalid set subcommand".to_string()
+                } else {
+                    let action_opt = &group_options[0];
+                    if action_opt.name == "limit" {
+                        if let CommandOptionValue::SubCommand(options) = &action_opt.value {
+                            let action = options
+                                .iter()
+                                .find(|o| o.name == "action")
+                                .and_then(|o| match &o.value {
+                                    CommandOptionValue::String(s) => Some(s.clone()),
+                                    _ => None,
+                                })
+                                .unwrap_or_else(|| "BAN_ADD".to_string());
 
-                let threshold = options
-                    .iter()
-                    .find(|o| o.name == "threshold")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::Integer(i) => Some(*i as i32),
-                        _ => None,
-                    })
-                    .unwrap_or(3);
+                            let threshold = options
+                                .iter()
+                                .find(|o| o.name == "threshold")
+                                .and_then(|o| match &o.value {
+                                    CommandOptionValue::Integer(i) => Some(*i as i32),
+                                    _ => None,
+                                })
+                                .unwrap_or(3);
 
-                let window_secs = options
-                    .iter()
-                    .find(|o| o.name == "window_secs")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::Integer(i) => Some(*i as i32),
-                        _ => None,
-                    })
-                    .unwrap_or(10);
+                            let window_secs = options
+                                .iter()
+                                .find(|o| o.name == "window_secs")
+                                .and_then(|o| match &o.value {
+                                    CommandOptionValue::Integer(i) => Some(*i as i32),
+                                    _ => None,
+                                })
+                                .unwrap_or(10);
 
-                let punishment = options
-                    .iter()
-                    .find(|o| o.name == "punishment")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "BAN".to_string());
+                            let punishment = options
+                                .iter()
+                                .find(|o| o.name == "punishment")
+                                .and_then(|o| match &o.value {
+                                    CommandOptionValue::String(s) => Some(s.clone()),
+                                    _ => None,
+                                })
+                                .unwrap_or_else(|| "BAN".to_string());
 
-                self.handle_limit(
-                    guild_id.get() as i64,
-                    action,
-                    threshold,
-                    window_secs,
-                    punishment,
-                    module_ctx,
-                )
-                .await?
+                            self.handle_limit(
+                                guild_id.get() as i64,
+                                action,
+                                threshold,
+                                window_secs,
+                                punishment,
+                                module_ctx,
+                            )
+                            .await?
+                        } else {
+                            "Invalid limit options".to_string()
+                        }
+                    } else {
+                        "Unknown set subcommand".to_string()
+                    }
+                }
+            }
+            ("whitelisted", CommandOptionValue::SubCommand(_)) => {
+                let repo =
+                    railway_database::repository::antinuke_repository::AntinukeRepository::new(
+                        module_ctx.db.clone(),
+                    );
+                let count = repo.get_whitelist_count(guild_id.get() as i64).await.unwrap_or(0);
+                format!("🛡️ There are currently **{}** users whitelisted from AntiNuke.", count)
             }
             ("settings", CommandOptionValue::SubCommand(_)) => {
                 self.handle_settings(guild_id.get() as i64, module_ctx).await?
@@ -212,13 +233,26 @@ impl AntinukeCommandHandler {
             "enable" => self.handle_enable(guild_id, module_ctx).await?,
             "disable" => self.handle_disable(guild_id, module_ctx).await?,
             "settings" => self.handle_settings(guild_id, module_ctx).await?,
-            "limit" => {
-                let action = args.get(1).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
-                let threshold = args.get(2).and_then(|s| s.parse::<i32>().ok()).unwrap_or(3);
-                let window = args.get(3).and_then(|s| s.parse::<i32>().ok()).unwrap_or(10);
-                let punishment = args.get(4).cloned().unwrap_or_else(|| "BAN".to_string());
-                self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
-                    .await?
+            "set" => {
+                let sub = args.get(1).map(|s| s.to_lowercase());
+                if sub.as_deref() == Some("limit") {
+                    let action = args.get(2).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
+                    let threshold = args.get(3).and_then(|s| s.parse::<i32>().ok()).unwrap_or(3);
+                    let window = args.get(4).and_then(|s| s.parse::<i32>().ok()).unwrap_or(10);
+                    let punishment = args.get(5).cloned().unwrap_or_else(|| "BAN".to_string());
+                    self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
+                        .await?
+                } else {
+                    "Invalid set subcommand. Use: `set limit`".to_string()
+                }
+            }
+            "whitelisted" => {
+                let repo =
+                    railway_database::repository::antinuke_repository::AntinukeRepository::new(
+                        module_ctx.db.clone(),
+                    );
+                let count = repo.get_whitelist_count(guild_id).await.unwrap_or(0);
+                format!("🛡️ There are currently **{}** users whitelisted from AntiNuke.", count)
             }
             "whitelist" => {
                 let sub = args.get(1).map(|s| s.to_lowercase());

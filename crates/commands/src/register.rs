@@ -41,7 +41,11 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
             .build(),
     )
     .option(
-        SubCommandBuilder::new("limit", "Set granular limits for a specific action")
+        SubCommandGroupBuilder::new("set", "Set configurations for antinuke")
+            .subcommands(vec![SubCommandBuilder::new(
+                "limit",
+                "Set granular limits for a specific action",
+            )
             .option(
                 StringBuilder::new("action", "The action to set a limit for")
                     .required(true)
@@ -75,9 +79,10 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
                         ("Timeout (30m)", "TIMEOUT"),
                     ],
                 ),
-            )
+            )])
             .build(),
     )
+    .option(SubCommandBuilder::new("whitelisted", "View how many users are whitelisted").build())
     .option(SubCommandBuilder::new("settings", "View current antinuke settings").build())
     .option(
         SubCommandGroupBuilder::new("whitelist", "Manage users exempt from antinuke")
