@@ -87,7 +87,10 @@ impl AntinukeCommandHandler {
         if threshold == 0 {
             Ok(format!("🚨 **Zero-Tolerance limit set for {}!** Instant {} will be applied on the very first detection.", action, punishment))
         } else {
-            Ok(format!("✅ Limit updated for **{}**: **{}** actions allowed.", action, threshold))
+            Ok(format!(
+                "✅ Limit updated for **{}**: **{}** actions allowed. Punishment: **{}**",
+                action, threshold, punishment
+            ))
         }
     }
 }

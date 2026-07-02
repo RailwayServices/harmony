@@ -71,8 +71,16 @@ impl AntinukeCommandHandler {
                                 })
                                 .unwrap_or(0);
 
+                            let punishment = options
+                                .iter()
+                                .find(|o| o.name == "punishment")
+                                .and_then(|o| match &o.value {
+                                    CommandOptionValue::String(s) => Some(s.clone()),
+                                    _ => None,
+                                })
+                                .unwrap_or_else(|| "BAN".to_string());
+
                             let window_secs = 60; // Default window
-                            let punishment = "BAN".to_string(); // Default punishment
 
                             self.handle_limit(
                                 guild_id.get() as i64,
@@ -244,7 +252,7 @@ impl AntinukeCommandHandler {
                     let action = args.get(2).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
                     let threshold = args.get(3).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
                     let window = 60;
-                    let punishment = "BAN".to_string();
+                    let punishment = args.get(4).cloned().unwrap_or_else(|| "BAN".to_string());
                     self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
                         .await?
                 } else {

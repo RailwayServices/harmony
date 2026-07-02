@@ -63,6 +63,16 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
                     .required(true)
                     .min_value(0)
                     .max_value(20),
+            )
+            .option(
+                StringBuilder::new("punishment", "The punishment to apply (Default: Ban)")
+                    .required(false)
+                    .choices(vec![
+                        ("Ban", "BAN"),
+                        ("Kick", "KICK"),
+                        ("Strip Roles", "STRIP_ROLES"),
+                        ("Timeout (30m)", "TIMEOUT"),
+                    ]),
             )])
             .build(),
     )
