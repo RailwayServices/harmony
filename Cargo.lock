@@ -1406,11 +1406,13 @@ dependencies = [
  "railway-modules-registry",
  "redis",
  "rustls",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "twilight-http",
+ "twilight-model",
 ]
 
 [[package]]

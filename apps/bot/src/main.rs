@@ -14,6 +14,8 @@ use tokio::signal;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
 
+mod glow;
+
 fn sanitize_postgres_url(url: &str) -> String {
     if let Some(pos) = url.find('@') {
         let host_part = &url[pos + 1..];
@@ -70,6 +72,12 @@ async fn main() -> Result<(), RailwayError> {
     info!("[DISCORD] Registering global slash commands...");
     railway_commands::register::register_global_commands(discord.clone()).await?;
     info!("[DISCORD] Global slash commands registered successfully");
+
+    // Attempt to apply Display Name Styles (Glow)
+    let glow_discord = discord.clone();
+    tokio::spawn(async move {
+        let _ = glow::apply_glow(glow_discord).await;
+    });
 
     info!("[TRANSPORT] Initializing local messaging transport (Buffer: 1024)...");
     let local_transport = Arc::new(LocalTransport::new(1024));
