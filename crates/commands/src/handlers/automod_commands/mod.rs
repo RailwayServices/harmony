@@ -7,6 +7,7 @@ use twilight_model::http::interaction::{InteractionResponse, InteractionResponse
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 pub mod config;
+mod words;
 
 #[derive(Clone)]
 pub struct AutomodCommandHandler {}
@@ -38,87 +39,20 @@ impl AutomodCommandHandler {
         let subcommand = &data.options[0];
 
         let reply_msg = match (subcommand.name.as_str(), &subcommand.value) {
-            ("enable", CommandOptionValue::SubCommand(options)) => {
-                let filter = options
-                    .iter()
-                    .find(|o| o.name == "filter")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "spam".to_string());
-                self.handle_enable(guild_id.get() as i64, filter, module_ctx).await?
+            ("enable", CommandOptionValue::SubCommand(_)) => {
+                self.handle_enable(guild_id.get() as i64, module_ctx).await?
             }
-            ("disable", CommandOptionValue::SubCommand(options)) => {
-                let filter = options
-                    .iter()
-                    .find(|o| o.name == "filter")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "spam".to_string());
-                self.handle_disable(guild_id.get() as i64, filter, module_ctx).await?
-            }
-            ("punishment", CommandOptionValue::SubCommand(options)) => {
-                let filter = options
-                    .iter()
-                    .find(|o| o.name == "filter")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "spam".to_string());
-
-                let action = options
-                    .iter()
-                    .find(|o| o.name == "action")
-                    .and_then(|o| match &o.value {
-                        CommandOptionValue::String(s) => Some(s.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| "delete".to_string());
-
-                self.handle_punishment(guild_id.get() as i64, filter, action, module_ctx).await?
+            ("disable", CommandOptionValue::SubCommand(_)) => {
+                self.handle_disable(guild_id.get() as i64, module_ctx).await?
             }
             ("settings", CommandOptionValue::SubCommand(_)) => {
-                self.handle_settings(guild_id.get() as i64, module_ctx).await?
+                "AutoMod settings are now managed in Discord's native Server Settings -> AutoMod."
+                    .to_string()
             }
             _ => "Unknown subcommand".to_string(),
         };
 
-        let action_row = if subcommand.name.as_str() == "settings" {
-            let spam =
-                railway_database::repository::automod_repository::AutomodRepository::get_rule(
-                    &module_ctx.db,
-                    guild_id.get() as i64,
-                    1,
-                )
-                .await?
-                .map(|r| r.enabled)
-                .unwrap_or(false);
-            let antilink =
-                railway_database::repository::automod_repository::AutomodRepository::get_rule(
-                    &module_ctx.db,
-                    guild_id.get() as i64,
-                    2,
-                )
-                .await?
-                .map(|r| r.enabled)
-                .unwrap_or(false);
-            let ghostping =
-                railway_database::repository::automod_repository::AutomodRepository::get_rule(
-                    &module_ctx.db,
-                    guild_id.get() as i64,
-                    3,
-                )
-                .await?
-                .map(|r| r.enabled)
-                .unwrap_or(false);
-            railway_common::ui::build_automod_settings_buttons(spam, antilink, ghostping)
-        } else {
-            railway_common::ui::build_support_action_row()
-        };
+        let action_row = railway_common::ui::build_support_action_row();
 
         let interaction_client = module_ctx.discord.interaction(interaction.application_id);
 
@@ -143,6 +77,44 @@ impl AutomodCommandHandler {
         };
 
         interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
+
+        interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
+
+        Ok(())
+    }
+
+    pub async fn handle_prefix(
+        &self,
+        ctx: &crate::prefix::PrefixContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), RailwayError> {
+        let guild_id = ctx.guild_id.get() as i64;
+        let args = &ctx.args;
+
+        if args.is_empty() {
+            let embed = railway_common::ui::build_stylish_embed(
+                "AutoMod Help",
+                "Available commands: `enable`, `disable`\n\nNote: AutoMod is now handled via Discord's native Server Settings.",
+                module_ctx.embed_color,
+            );
+            let action_row = railway_common::ui::build_support_action_row();
+            return ctx.reply_with_ui(embed, vec![action_row]).await;
+        }
+
+        let subcommand = args[0].to_lowercase();
+        let reply_msg = match subcommand.as_str() {
+            "enable" => self.handle_enable(guild_id, module_ctx).await?,
+            "disable" => self.handle_disable(guild_id, module_ctx).await?,
+            _ => "Unknown command. Use `enable` or `disable`.".to_string(),
+        };
+
+        let embed = railway_common::ui::build_stylish_embed(
+            "AutoMod Command",
+            &reply_msg,
+            module_ctx.embed_color,
+        );
+
+        ctx.reply_with_ui(embed, vec![]).await?;
 
         Ok(())
     }

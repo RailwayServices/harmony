@@ -95,46 +95,8 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
         CommandType::ChatInput,
     )
     .default_member_permissions(Permissions::MANAGE_GUILD)
-    .option(
-        SubCommandBuilder::new("enable", "Enable an automod filter")
-            .option(StringBuilder::new("filter", "The filter to enable").required(true).choices(
-                vec![
-                    ("Spam Filter", "spam"),
-                    ("Anti-Link (Invites)", "antilink"),
-                    ("Ghost Ping", "ghostping"),
-                ],
-            ))
-            .build(),
-    )
-    .option(
-        SubCommandBuilder::new("disable", "Disable an automod filter")
-            .option(StringBuilder::new("filter", "The filter to disable").required(true).choices(
-                vec![
-                    ("Spam Filter", "spam"),
-                    ("Anti-Link (Invites)", "antilink"),
-                    ("Ghost Ping", "ghostping"),
-                ],
-            ))
-            .build(),
-    )
-    .option(
-        SubCommandBuilder::new("punishment", "Set the punishment for a filter")
-            .option(StringBuilder::new("filter", "The filter to configure").required(true).choices(
-                vec![
-                    ("Spam Filter", "spam"),
-                    ("Anti-Link (Invites)", "antilink"),
-                    ("Ghost Ping", "ghostping"),
-                ],
-            ))
-            .option(StringBuilder::new("action", "The action to take").required(true).choices(
-                vec![
-                    ("Delete Message", "delete"),
-                    ("Timeout (5m)", "timeout"),
-                    ("Delete & Timeout", "delete_and_timeout"),
-                ],
-            ))
-            .build(),
-    )
+    .option(SubCommandBuilder::new("enable", "Enable AutoModeration").build())
+    .option(SubCommandBuilder::new("disable", "Disable AutoModeration").build())
     .option(SubCommandBuilder::new("settings", "View current AutoMod settings").build())
     .build();
 

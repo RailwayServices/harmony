@@ -1,169 +1,94 @@
 use super::AutomodCommandHandler;
 use railway_common::error::RailwayError;
 use railway_common::module::ModuleContext;
-use railway_database::models::automod_rule::{ActionType, TriggerType};
-use railway_database::repository::automod_repository::AutomodRepository;
 
 impl AutomodCommandHandler {
-    fn parse_filter(filter: &str) -> Option<TriggerType> {
-        match filter {
-            "spam" => Some(TriggerType::Spam),
-            "antilink" => Some(TriggerType::AntiLink),
-            "ghostping" => Some(TriggerType::GhostPing),
-            _ => None,
-        }
-    }
-
-    fn parse_action(action: &str) -> Option<ActionType> {
-        match action {
-            "delete" => Some(ActionType::DeleteMessage),
-            "timeout" => Some(ActionType::Timeout),
-            "delete_and_timeout" => Some(ActionType::DeleteAndTimeout),
-            _ => None,
-        }
-    }
-
     pub async fn handle_enable(
         &self,
         guild_id: i64,
-        filter: String,
         module_ctx: &ModuleContext,
     ) -> Result<String, RailwayError> {
-        let trigger = match Self::parse_filter(&filter) {
-            Some(t) => t,
-            None => return Ok("Invalid filter type.".to_string()),
+        let client = module_ctx.discord.clone();
+        let guild_marker = twilight_model::id::Id::new(guild_id as u64);
+
+        use twilight_model::guild::auto_moderation::{
+            AutoModerationEventType, AutoModerationKeywordPresetType,
         };
 
-        // Check if rule exists, otherwise create
-        let rule = AutomodRepository::get_rule(&module_ctx.db, guild_id, trigger as i16)
-            .await
-            .ok()
-            .flatten();
+        let words = crate::handlers::automod_commands::words::ENGWORDLIST;
 
-        if let Some(mut r) = rule {
-            r.enabled = true;
-            AutomodRepository::update_rule(&module_ctx.db, &r).await?;
-        } else {
-            // Default action depends on filter
-            let action = match trigger {
-                TriggerType::Spam => ActionType::Timeout,
-                TriggerType::AntiLink => ActionType::DeleteMessage,
-                TriggerType::GhostPing => ActionType::Timeout,
-            };
-
-            AutomodRepository::create_rule(
-                &module_ctx.db,
-                guild_id,
-                &format!("AutoMod {:?}", trigger),
-                trigger as i16,
-                action as i16,
-                true,
+        // Rule 1: Keyword Filter
+        let _ = client
+            .create_auto_moderation_rule(
+                guild_marker,
+                "Prismo AutoMod Rule 1",
+                AutoModerationEventType::MessageSend,
             )
-            .await?;
-        }
+            .enabled(true)
+            .action_block_message()
+            .with_keyword(words, &[], &[])
+            .await;
 
-        Ok(format!("Successfully enabled **{:?}** filter.", trigger))
+        // Rule 2: Mention Spam
+        let _ = client
+            .create_auto_moderation_rule(
+                guild_marker,
+                "Prismo AutoMod Rule 2",
+                AutoModerationEventType::MessageSend,
+            )
+            .enabled(true)
+            .action_block_message()
+            .with_mention_spam(5)
+            .await;
+
+        // Rule 3: Keyword Preset
+        let presets = [
+            AutoModerationKeywordPresetType::Profanity,
+            AutoModerationKeywordPresetType::SexualContent,
+            AutoModerationKeywordPresetType::Slurs,
+        ];
+        let _ = client
+            .create_auto_moderation_rule(
+                guild_marker,
+                "Prismo AutoMod Rule 3",
+                AutoModerationEventType::MessageSend,
+            )
+            .enabled(true)
+            .action_block_message()
+            .with_keyword_preset(&presets, &[])
+            .await;
+
+        // Rule 4: Spam
+        let _ = client
+            .create_auto_moderation_rule(
+                guild_marker,
+                "Prismo AutoMod Rule 4",
+                AutoModerationEventType::MessageSend,
+            )
+            .enabled(true)
+            .action_block_message()
+            .with_spam()
+            .await;
+
+        Ok("✅ AutoMod has been **enabled** in this server! All Native rules created.".to_string())
     }
 
     pub async fn handle_disable(
         &self,
         guild_id: i64,
-        filter: String,
         module_ctx: &ModuleContext,
     ) -> Result<String, RailwayError> {
-        let trigger = match Self::parse_filter(&filter) {
-            Some(t) => t,
-            None => return Ok("Invalid filter type.".to_string()),
-        };
+        let client = module_ctx.discord.clone();
+        let guild_marker = twilight_model::id::Id::new(guild_id as u64);
 
-        if let Some(mut rule) =
-            AutomodRepository::get_rule(&module_ctx.db, guild_id, trigger as i16)
-                .await
-                .ok()
-                .flatten()
-        {
-            rule.enabled = false;
-            AutomodRepository::update_rule(&module_ctx.db, &rule).await?;
-            Ok(format!("Successfully disabled **{:?}** filter.", trigger))
-        } else {
-            Ok(format!("The **{:?}** filter is already disabled.", trigger))
-        }
-    }
-
-    pub async fn handle_punishment(
-        &self,
-        guild_id: i64,
-        filter: String,
-        action_str: String,
-        module_ctx: &ModuleContext,
-    ) -> Result<String, RailwayError> {
-        let trigger = match Self::parse_filter(&filter) {
-            Some(t) => t,
-            None => return Ok("Invalid filter type.".to_string()),
-        };
-
-        let action = match Self::parse_action(&action_str) {
-            Some(a) => a,
-            None => return Ok("Invalid action type.".to_string()),
-        };
-
-        if let Some(mut rule) =
-            AutomodRepository::get_rule(&module_ctx.db, guild_id, trigger as i16)
-                .await
-                .ok()
-                .flatten()
-        {
-            rule.action_type = action as i16;
-            AutomodRepository::update_rule(&module_ctx.db, &rule).await?;
-            Ok(format!("Updated punishment for **{:?}** to **{:?}**.", trigger, action))
-        } else {
-            Ok(format!(
-                "The **{:?}** filter must be enabled first before configuring punishment.",
-                trigger
-            ))
-        }
-    }
-
-    pub async fn handle_settings(
-        &self,
-        guild_id: i64,
-        module_ctx: &ModuleContext,
-    ) -> Result<String, RailwayError> {
-        let spam = AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::Spam as i16)
-            .await
-            .ok()
-            .flatten();
-        let antilink =
-            AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::AntiLink as i16)
-                .await
-                .ok()
-                .flatten();
-        let ghostping =
-            AutomodRepository::get_rule(&module_ctx.db, guild_id, TriggerType::GhostPing as i16)
-                .await
-                .ok()
-                .flatten();
-
-        let format_rule = |rule: &Option<railway_database::models::automod_rule::AutomodRule>| {
-            if let Some(r) = rule {
-                let status = if r.enabled { "🟢 Enabled" } else { "🔴 Disabled" };
-                let action = match ActionType::try_from(r.action_type) {
-                    Ok(ActionType::DeleteMessage) => "Delete Message",
-                    Ok(ActionType::Timeout) => "Timeout (5m)",
-                    Ok(ActionType::DeleteAndTimeout) => "Delete & Timeout",
-                    _ => "Unknown",
-                };
-                format!("{} (Punishment: {})", status, action)
-            } else {
-                "🔴 Disabled (Not configured)".to_string()
+        if let Ok(response) = client.auto_moderation_rules(guild_marker).await {
+            if let Ok(rules) = response.model().await {
+                for rule in rules {
+                    let _ = client.delete_auto_moderation_rule(guild_marker, rule.id).await;
+                }
             }
-        };
+        }
 
-        Ok(format!(
-            "**AutoMod Settings**\n\n**Spam Filter:** {}\n**Anti-Link (Invites):** {}\n**Ghost Ping:** {}",
-            format_rule(&spam),
-            format_rule(&antilink),
-            format_rule(&ghostping),
-        ))
+        Ok("✅ AutoMod has been **disabled** in this server! All Native rules deleted.".to_string())
     }
 }
