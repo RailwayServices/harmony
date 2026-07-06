@@ -141,15 +141,6 @@ impl AntinukeCommandHandler {
                                 })
                                 .unwrap_or(0);
 
-                            let punishment = options
-                                .iter()
-                                .find(|o| o.name == "punishment")
-                                .and_then(|o| match &o.value {
-                                    CommandOptionValue::String(s) => Some(s.clone()),
-                                    _ => None,
-                                })
-                                .unwrap_or_else(|| "BAN".to_string());
-
                             let window_secs = 60; // Default window
 
                             self.handle_limit(
@@ -157,7 +148,6 @@ impl AntinukeCommandHandler {
                                 action,
                                 threshold,
                                 window_secs,
-                                punishment,
                                 module_ctx,
                             )
                             .await?
@@ -168,6 +158,28 @@ impl AntinukeCommandHandler {
                         "Unknown set subcommand".to_string()
                     }
                 }
+            }
+            ("punishment", CommandOptionValue::SubCommand(options)) => {
+                let action = options
+                    .iter()
+                    .find(|o| o.name == "action")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "BAN_ADD".to_string());
+
+                let punishment = options
+                    .iter()
+                    .find(|o| o.name == "punishment")
+                    .and_then(|o| match &o.value {
+                        CommandOptionValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "BAN".to_string());
+
+                self.handle_punishment(guild_id.get() as i64, action, punishment, module_ctx)
+                    .await?
             }
             ("whitelisted", CommandOptionValue::SubCommand(_)) => {
                 let repo =
@@ -318,7 +330,7 @@ impl AntinukeCommandHandler {
         if args.is_empty() {
             let embed = railway_common::ui::build_stylish_embed(
                 "AntiNuke Help",
-                "Available commands: `enable`, `disable`, `settings`, `set limit`, `whitelisted`, `whitelist`",
+                "Available commands: `enable`, `disable`, `settings`, `set limit`, `punishment`, `whitelisted`, `whitelist`",
                 module_ctx.embed_color,
             );
             let action_row = railway_common::ui::build_support_action_row();
@@ -336,9 +348,7 @@ impl AntinukeCommandHandler {
                     let action = args.get(2).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
                     let threshold = args.get(3).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
                     let window = 60;
-                    let punishment = args.get(4).cloned().unwrap_or_else(|| "BAN".to_string());
-                    self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
-                        .await?
+                    self.handle_limit(guild_id, action, threshold, window, module_ctx).await?
                 } else {
                     "Invalid set subcommand. Use: `set limit`".to_string()
                 }
@@ -347,9 +357,12 @@ impl AntinukeCommandHandler {
                 let action = args.get(1).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
                 let threshold = args.get(2).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
                 let window = 60;
-                let punishment = args.get(3).cloned().unwrap_or_else(|| "BAN".to_string());
-                self.handle_limit(guild_id, action, threshold, window, punishment, module_ctx)
-                    .await?
+                self.handle_limit(guild_id, action, threshold, window, module_ctx).await?
+            }
+            "punishment" => {
+                let action = args.get(1).cloned().unwrap_or_else(|| "BAN_ADD".to_string());
+                let punishment = args.get(2).cloned().unwrap_or_else(|| "BAN".to_string());
+                self.handle_punishment(guild_id, action, punishment, module_ctx).await?
             }
             "whitelisted" => {
                 let repo =

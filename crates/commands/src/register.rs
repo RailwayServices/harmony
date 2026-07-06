@@ -51,16 +51,28 @@ pub async fn register_global_commands(http: Arc<HttpClient>) -> Result<(), Railw
                     .required(true)
                     .min_value(0)
                     .max_value(20),
+            )])
+            .build(),
+    )
+    .option(
+        SubCommandBuilder::new("punishment", "Set punishment for an action")
+            .option(
+                StringBuilder::new("action", "The action to set punishment for")
+                    .required(true)
+                    .choices(vec![
+                        ("Banning Members", "BAN_ADD"),
+                        ("Kicking Members", "MEMBER_KICK"),
+                        ("Deleting Roles", "ROLE_DELETE"),
+                        ("Creating Roles", "ROLE_CREATE"),
+                        ("Deleting Channels", "CHANNEL_DELETE"),
+                        ("Creating Channels", "CHANNEL_CREATE"),
+                    ]),
             )
             .option(
-                StringBuilder::new("punishment", "The punishment to apply (Default: Ban)")
-                    .required(false)
-                    .choices(vec![
-                        ("Ban", "BAN"),
-                        ("Kick", "KICK"),
-                        ("Strip Roles", "STRIP_ROLES"),
-                    ]),
-            )])
+                StringBuilder::new("punishment", "The punishment to apply").required(true).choices(
+                    vec![("Ban", "BAN"), ("Kick", "KICK"), ("Strip Roles", "STRIP_ROLES")],
+                ),
+            )
             .build(),
     )
     .option(SubCommandBuilder::new("whitelisted", "View how many users are whitelisted").build())

@@ -88,10 +88,13 @@ impl AntinukeCommandHandler {
         action: String,
         threshold: i32,
         window_secs: i32,
-        punishment: String,
         module_ctx: &ModuleContext,
     ) -> Result<String, RailwayError> {
         let repo = AntinukeRepository::new(module_ctx.db.clone());
+
+        let configs = repo.get_module_configs(guild_id).await?;
+        let existing = configs.into_iter().find(|c| c.action_type == action);
+        let punishment = existing.map(|c| c.punishment).unwrap_or_else(|| "BAN".to_string());
 
         let module_config = AntinukeModuleConfigRow {
             guild_id,
@@ -115,5 +118,36 @@ impl AntinukeCommandHandler {
                 action, threshold, punishment
             ))
         }
+    }
+
+    pub(super) async fn handle_punishment(
+        &self,
+        guild_id: i64,
+        action: String,
+        punishment: String,
+        module_ctx: &ModuleContext,
+    ) -> Result<String, RailwayError> {
+        let repo = AntinukeRepository::new(module_ctx.db.clone());
+
+        let configs = repo.get_module_configs(guild_id).await?;
+        let mut existing =
+            configs.into_iter().find(|c| c.action_type == action).unwrap_or_else(|| {
+                AntinukeModuleConfigRow {
+                    guild_id,
+                    action_type: action.clone(),
+                    enabled: false,
+                    threshold: 3,
+                    window_secs: 60,
+                    punishment: "BAN".to_string(),
+                    log_only: false,
+                }
+            });
+
+        existing.punishment = punishment.clone();
+        repo.upsert_module_config(&existing).await?;
+
+        railway_antinuke::reload_guild_config(&module_ctx.db, guild_id as u64).await;
+
+        Ok(format!("⚖️ Punishment for **{}** has been updated to **{}**.", action, punishment))
     }
 }
