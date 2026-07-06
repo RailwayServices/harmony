@@ -4,7 +4,6 @@ use railway_common::module::ModuleContext;
 use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::InteractionData;
 use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType};
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 pub mod config;
 mod words;
@@ -38,6 +37,17 @@ impl AutomodCommandHandler {
 
         let subcommand = &data.options[0];
 
+        let interaction_client = module_ctx.discord.interaction(interaction.application_id);
+
+        // Defer interaction to avoid 3-second timeout
+        let defer_response = InteractionResponse {
+            kind: InteractionResponseType::DeferredChannelMessageWithSource,
+            data: None,
+        };
+        interaction_client
+            .create_response(interaction.id, &interaction.token, &defer_response)
+            .await?;
+
         let reply_msg = match (subcommand.name.as_str(), &subcommand.value) {
             ("enable", CommandOptionValue::SubCommand(_)) => {
                 self.handle_enable(guild_id.get() as i64, module_ctx).await?
@@ -66,19 +76,11 @@ impl AutomodCommandHandler {
             module_ctx.embed_color,
         );
 
-        let response = InteractionResponse {
-            kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(
-                InteractionResponseDataBuilder::new()
-                    .embeds([embed])
-                    .components([action_row])
-                    .build(),
-            ),
-        };
-
-        interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
-
-        interaction_client.create_response(interaction.id, &interaction.token, &response).await?;
+        interaction_client
+            .update_response(&interaction.token)
+            .embeds(Some(&[embed]))
+            .components(Some(&[action_row]))
+            .await?;
 
         Ok(())
     }
