@@ -24,6 +24,7 @@ services:
   bot:
     image: ghcr.io/harmonyservices/harmony:latest
     container_name: harmony-bot
+    command: ["harmony-bot"]
     restart: unless-stopped
     env_file:
       - ../.env
@@ -33,22 +34,18 @@ services:
     depends_on:
       - postgres
       - redis
+      - gateway
 
-  api:
+  gateway:
     image: ghcr.io/harmonyservices/harmony:latest
-    container_name: harmony-api
-    command: ["harmony-api"]
+    container_name: harmony-gateway
+    command: ["harmony-gateway-app"]
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     env_file:
       - ../.env
     environment:
-      - DATABASE_URL=postgresql://waris@postgres:5432/postgresx
       - REDIS_URL=redis://redis:6379
-      - API_PORT=3000
     depends_on:
-      - postgres
       - redis
 
 volumes:

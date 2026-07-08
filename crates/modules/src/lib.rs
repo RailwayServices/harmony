@@ -11,6 +11,8 @@ use lavende::{LavendeEvent, LavendeManager};
 use std::sync::OnceLock;
 
 pub static LAVENDE_MANAGER: OnceLock<Arc<LavendeManager>> = OnceLock::new();
+pub mod state_sync;
+
 pub static VOICE_STATES: OnceLock<Arc<DashMap<u64, u64>>> = OnceLock::new();
 pub static IDLE_TIMERS: OnceLock<Arc<DashMap<String, tokio::sync::watch::Sender<bool>>>> =
     OnceLock::new();
@@ -40,10 +42,10 @@ impl MusicModule {
 
         tokio::spawn(async move {
             while let Ok(event) = events.recv().await {
-                match event {
+                match &event {
                     LavendeEvent::TrackStart { guild_id, track } => {
                         if let Some(timers) = IDLE_TIMERS.get() {
-                            if let Some((_, tx)) = timers.remove(&guild_id) {
+                            if let Some((_, tx)) = timers.remove(guild_id) {
                                 let _ = tx.send(true);
                             }
                         }
@@ -53,7 +55,7 @@ impl MusicModule {
                             track.info.title
                         );
                         if let Some(manager) = LAVENDE_MANAGER.get() {
-                            if let Some(player) = manager.get_player(&guild_id) {
+                            if let Some(player) = manager.get_player(guild_id) {
                                 if let Some(channel_val) = player.get_data("text_channel_id") {
                                     if let Some(channel_id_u64) = channel_val.as_u64() {
                                         let channel_id = Id::<ChannelMarker>::new(channel_id_u64);
@@ -140,6 +142,33 @@ impl MusicModule {
                     }
                     _ => {}
                 }
+
+                let guild_id_opt = match &event {
+                    LavendeEvent::TrackStart { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::TrackEnd { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::TrackException { guild_id, .. } => {
+                        Some((guild_id.clone(), false))
+                    }
+                    LavendeEvent::TrackStuck { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::Paused { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::Resumed { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::VolumeChanged { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::QueueEnd { guild_id } => Some((guild_id.clone(), false)),
+                    LavendeEvent::Error { guild_id, .. } => Some((guild_id.clone(), false)),
+                    LavendeEvent::PlayerDestroy { guild_id, .. } => Some((guild_id.clone(), true)),
+                    LavendeEvent::Position { .. } => None,
+                };
+
+                if let Some((g_id, is_destroy)) = guild_id_opt {
+                    let mut redis_conn = ctx.cache.clone();
+                    if is_destroy {
+                        state_sync::delete_player_state(&g_id, &mut redis_conn).await;
+                    } else if let Some(manager) = LAVENDE_MANAGER.get() {
+                        if let Some(player) = manager.get_player(&g_id) {
+                            state_sync::sync_player_state(&g_id, &player, &mut redis_conn).await;
+                        }
+                    }
+                }
             }
         });
 
@@ -172,7 +201,7 @@ impl Module for MusicModule {
 
             if let HarmonyEvent::Discord(discord_event) = event_clone {
                 match discord_event.as_ref() {
-                    twilight_model::gateway::event::Event::GuildCreate(gc) => {
+                    harmony_common::event::SerializableEvent::GuildCreate(gc) => {
                         if let twilight_model::gateway::payload::incoming::GuildCreate::Available(
                             guild,
                         ) = gc.as_ref()
@@ -186,7 +215,7 @@ impl Module for MusicModule {
                             }
                         }
                     }
-                    twilight_model::gateway::event::Event::VoiceStateUpdate(vsu) => {
+                    harmony_common::event::SerializableEvent::VoiceStateUpdate(vsu) => {
                         if let Some(states) = VOICE_STATES.get() {
                             if let Some(channel_id) = vsu.channel_id {
                                 states.insert(vsu.user_id.get(), channel_id.get());
@@ -210,7 +239,7 @@ impl Module for MusicModule {
                         });
                         lavende_manager.send_raw_data(&packet).await;
                     }
-                    twilight_model::gateway::event::Event::VoiceServerUpdate(vsu) => {
+                    harmony_common::event::SerializableEvent::VoiceServerUpdate(vsu) => {
                         let packet = serde_json::json!({
                             "t": "VOICE_SERVER_UPDATE",
                             "d": {

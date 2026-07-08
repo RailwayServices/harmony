@@ -7,7 +7,6 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{error, info, warn};
 use twilight_gateway::{EventTypeFlags, StreamExt as _};
-use twilight_model::gateway::event::Event;
 
 const RELEVANT_FLAGS: EventTypeFlags = EventTypeFlags::GUILD_CREATE
     .union(EventTypeFlags::GUILD_DELETE)
@@ -22,8 +21,13 @@ const RELEVANT_FLAGS: EventTypeFlags = EventTypeFlags::GUILD_CREATE
     .union(EventTypeFlags::GATEWAY_INVALIDATE_SESSION)
     .union(EventTypeFlags::GATEWAY_RECONNECT);
 
-fn is_voice_critical(event: &Event) -> bool {
-    matches!(event, Event::VoiceStateUpdate(_) | Event::VoiceServerUpdate(_))
+use harmony_common::event::SerializableEvent;
+
+fn is_voice_critical(event: &SerializableEvent) -> bool {
+    matches!(
+        event,
+        SerializableEvent::VoiceStateUpdate(_) | SerializableEvent::VoiceServerUpdate(_)
+    )
 }
 
 pub struct EventLoop<P: Publisher> {

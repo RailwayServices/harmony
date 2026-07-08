@@ -18,13 +18,14 @@ impl CommandRouter {
         module_ctx: &ModuleContext,
     ) -> Result<(), HarmonyError> {
         if let harmony_common::event::HarmonyEvent::Discord(arc_event) = event {
-            if let twilight_model::gateway::event::Event::InteractionCreate(interaction) =
+            if let harmony_common::event::SerializableEvent::InteractionCreate(interaction) =
                 arc_event.as_ref()
             {
                 let interaction_ctx = InteractionContext::new(interaction.0.clone());
                 return self.route(&interaction_ctx, module_ctx).await;
             }
-            if let twilight_model::gateway::event::Event::MessageCreate(msg) = arc_event.as_ref() {
+            if let harmony_common::event::SerializableEvent::MessageCreate(msg) = arc_event.as_ref()
+            {
                 return self.prefix_router.handle_message(&msg.0, module_ctx).await;
             }
         }

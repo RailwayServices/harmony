@@ -88,6 +88,13 @@ pub async fn handle(
                     }
                     let _ = player.play().await;
                 }
+                let mut redis_conn = module_ctx.cache.clone();
+                harmony_modules::state_sync::sync_player_state(
+                    &guild_id.to_string(),
+                    &player,
+                    &mut redis_conn,
+                )
+                .await;
             }
             LoadResult::Search(tracks) => {
                 if let Some(track) = tracks.first() {
@@ -112,6 +119,13 @@ pub async fn handle(
                         }
                         let _ = player.play().await;
                     }
+                    let mut redis_conn = module_ctx.cache.clone();
+                    harmony_modules::state_sync::sync_player_state(
+                        &guild_id.to_string(),
+                        &player,
+                        &mut redis_conn,
+                    )
+                    .await;
                 }
             }
             LoadResult::Playlist(playlist) => {
@@ -134,6 +148,13 @@ pub async fn handle(
                     }
                     let _ = player.play().await;
                 }
+                let mut redis_conn = module_ctx.cache.clone();
+                harmony_modules::state_sync::sync_player_state(
+                    &guild_id.to_string(),
+                    &player,
+                    &mut redis_conn,
+                )
+                .await;
             }
             LoadResult::Error(e) => {
                 tracing::error!("[PLAY] Load error: {:?}", e.message);

@@ -3,11 +3,8 @@ use harmony_common::config::AppConfig;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::{Module, ModuleContext};
 use harmony_database::pool::Database;
-use harmony_gateway::dispatcher::EventDispatcher;
-use harmony_gateway::event_loop::EventLoop;
-use harmony_gateway::shard_manager::ShardManager;
 use harmony_messaging::subscriber::Subscriber;
-use harmony_messaging::transport::local_transport::LocalTransport;
+use harmony_messaging::transport::redis_transport::RedisTransport;
 use harmony_modules::{MusicModule, LAVENDE_MANAGER};
 use std::sync::Arc;
 use tokio::signal;
@@ -79,11 +76,16 @@ async fn main() -> Result<(), HarmonyError> {
     info!("[DISCORD] Global slash commands registered successfully");
 
     info!(
-        "[TRANSPORT] Initializing local messaging transport (capacity: {})...",
+        "[TRANSPORT] Initializing Redis messaging transport (capacity: {})...",
         config.event_bus_capacity
     );
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(config.event_bus_capacity);
-    let local_transport = Arc::new(LocalTransport::new(config.event_bus_capacity));
+    let redis_transport = Arc::new(RedisTransport::new(
+        &config.redis_url,
+        "harmony_events_worker",
+        "harmony_events_discord",
+        config.event_bus_capacity,
+    )?);
 
     let module_ctx = Arc::new(ModuleContext {
         db,
@@ -94,7 +96,59 @@ async fn main() -> Result<(), HarmonyError> {
     });
 
     let registry = Arc::new(MusicModule::new(module_ctx.clone()));
-    let mut rx = local_transport.subscribe().await?;
+
+    {
+        use redis::AsyncCommands;
+        let mut redis_conn = module_ctx.cache.clone();
+        if let Ok(keys) = redis_conn.keys::<_, Vec<String>>("harmony:player_state:*").await {
+            let manager_opt = LAVENDE_MANAGER.get();
+            if let Some(manager) = manager_opt {
+                let dummy = manager.get_or_create_player("1");
+                tokio::spawn(async move {
+                    let _ = dummy.search("warmup").await;
+                    manager.destroy_player("1").await;
+                });
+
+                for key in keys {
+                    if let Ok(json_str) = redis_conn.get::<_, String>(&key).await {
+                        if let Ok(payload) = serde_json::from_str::<
+                            harmony_modules::state_sync::PlayerStatePayload,
+                        >(&json_str)
+                        {
+                            let guild_id = payload.guild_id.clone();
+                            let player = manager.get_or_create_player(&guild_id);
+                            let was_paused = payload.paused;
+                            let voice_channel_id = payload.voice_channel_id.clone();
+                            harmony_modules::state_sync::restore_player_state(
+                                &guild_id, &player, payload,
+                            )
+                            .await;
+                            tracing::info!(
+                                "[STATE_SYNC] Restored player state for guild {}",
+                                guild_id
+                            );
+
+                            if let Some(vc_id) = voice_channel_id {
+                                let p = player.clone();
+                                tokio::spawn(async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                    let _ = p.connect(Some(vc_id), true, false).await;
+
+                                    if !was_paused {
+                                        tokio::time::sleep(std::time::Duration::from_millis(1000))
+                                            .await;
+                                        let _ = p.play().await;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut rx = redis_transport.subscribe().await?;
     let registry_ctx = module_ctx.clone();
     let module_sem = Arc::new(Semaphore::new(CONSUMER_CONCURRENCY));
 
@@ -131,7 +185,7 @@ async fn main() -> Result<(), HarmonyError> {
     });
 
     let command_router = Arc::new(CommandRouter::new(config.prefix.clone()));
-    let mut cmd_rx = local_transport.subscribe().await?;
+    let mut cmd_rx = redis_transport.subscribe().await?;
     let cmd_ctx = module_ctx.clone();
     let cmd_sem = Arc::new(Semaphore::new(CONSUMER_CONCURRENCY));
 
@@ -167,19 +221,18 @@ async fn main() -> Result<(), HarmonyError> {
         }
     });
 
-    info!("[GATEWAY] Initializing Shard Manager with recommended sharding...");
-    let shard_manager =
-        ShardManager::new(config.discord_token.clone(), &module_ctx.discord).await?;
-    let dispatcher = EventDispatcher::new(local_transport.clone());
-    let event_loop = EventLoop::new(shard_manager, dispatcher, event_rx, config.max_event_tasks);
-
+    let redis_publisher = redis_transport.clone();
     tokio::spawn(async move {
-        if let Err(e) = event_loop.run().await {
-            error!("[GATEWAY] Gateway event loop crashed: {}", e);
+        let mut forward_rx = event_rx;
+        use harmony_messaging::publisher::Publisher;
+        while let Some(event) = forward_rx.recv().await {
+            if let Err(e) = redis_publisher.publish(Arc::new(event)).await {
+                error!("[WORKER] Failed to publish event to Redis: {}", e);
+            }
         }
     });
 
-    info!("[SYSTEM] Connected to Discord as {}", bot_name);
+    info!("[SYSTEM] Connected to Discord as {} (Worker Node)", bot_name);
     info!("[SYSTEM] Waiting for shutdown signal...");
 
     match signal::ctrl_c().await {

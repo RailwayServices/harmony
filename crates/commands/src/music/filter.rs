@@ -91,6 +91,14 @@ pub async fn handle_filter(
             .color(module_ctx.embed_color)
             .build();
 
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
+
         let _ = interaction_ctx.reply_embed(embed, module_ctx).await;
     } else {
         let embed = EmbedBuilder::new()

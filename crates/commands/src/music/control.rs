@@ -19,6 +19,13 @@ pub async fn handle_stop(
     if let Some(player) = manager.get_player(&guild_id.to_string()) {
         tracing::info!("[CONTROL] Stopping playback in Guild {}", guild_id);
         player.stop().await;
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
         let embed = EmbedBuilder::new()
             .description("⏹️ Stopped playback and cleared the queue.")
             .color(module_ctx.embed_color)
@@ -50,6 +57,13 @@ pub async fn handle_skip(
     if let Some(player) = manager.get_player(&guild_id.to_string()) {
         tracing::info!("[CONTROL] Skipping track in Guild {}", guild_id);
         player.skip().await;
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
         let embed = EmbedBuilder::new()
             .description("⏭️ Skipped the current track.")
             .color(module_ctx.embed_color)
@@ -81,6 +95,13 @@ pub async fn handle_pause(
     if let Some(player) = manager.get_player(&guild_id.to_string()) {
         tracing::info!("[CONTROL] Pausing playback in Guild {}", guild_id);
         player.pause(true).await;
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
         let embed = EmbedBuilder::new()
             .description("⏸️ Paused playback.")
             .color(module_ctx.embed_color)
@@ -112,6 +133,13 @@ pub async fn handle_resume(
     if let Some(player) = manager.get_player(&guild_id.to_string()) {
         tracing::info!("[CONTROL] Resuming playback in Guild {}", guild_id);
         player.resume().await;
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
         let embed = EmbedBuilder::new()
             .description("▶️ Resumed playback.")
             .color(module_ctx.embed_color)
@@ -145,6 +173,13 @@ pub async fn handle_volume(
     if let Some(player) = manager.get_player(&guild_id.to_string()) {
         tracing::info!("[CONTROL] Setting volume to {} in Guild {}", vol, guild_id);
         player.set_volume(vol as u32).await;
+        let mut redis_conn = module_ctx.cache.clone();
+        harmony_modules::state_sync::sync_player_state(
+            &guild_id.to_string(),
+            &player,
+            &mut redis_conn,
+        )
+        .await;
         let embed = EmbedBuilder::new()
             .description(format!("🔊 Volume set to {}%", vol))
             .color(module_ctx.embed_color)

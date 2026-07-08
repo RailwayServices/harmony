@@ -1,0 +1,18 @@
+[package]
+name = "harmony-gateway-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+harmony-common = { path = "../../crates/common" }
+harmony-gateway = { path = "../../crates/gateway" }
+harmony-messaging = { path = "../../crates/messaging" }
+
+tokio = { version = "1.52", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+dotenvy = "0.15"
+twilight-model = "0.17"
+twilight-http = { version = "0.17", default-features = false, features = ["simd-json", "rustls-native-roots"] }
+rustls = { version = "0.23", features = ["ring"] }
