@@ -1,4 +1,4 @@
-use railway_common::error::RailwayError;
+use harmony_common::error::HarmonyError;
 use twilight_gateway::{ConfigBuilder, Intents, Shard, ShardId};
 use twilight_http::Client as HttpClient;
 
@@ -7,12 +7,13 @@ pub struct ShardManager {
 }
 
 impl ShardManager {
-    pub async fn new(token: String, http: &HttpClient) -> Result<Self, RailwayError> {
+    pub async fn new(token: String, http: &HttpClient) -> Result<Self, HarmonyError> {
         let intents = Intents::GUILDS
             | Intents::GUILD_MESSAGES
             | Intents::MESSAGE_CONTENT
             | Intents::GUILD_MODERATION
-            | Intents::GUILD_MEMBERS;
+            | Intents::GUILD_MEMBERS
+            | Intents::GUILD_VOICE_STATES;
 
         let base_config = ConfigBuilder::new(token, intents).identify_properties(
             twilight_model::gateway::payload::outgoing::identify::IdentifyProperties::new(
@@ -40,7 +41,7 @@ impl ShardManager {
                     name: "Custom Status".into(),
                     party: None,
                     secrets: None,
-                    state: Some(format!("🔗 /help · railway · ✦ cluster {}", shard_id.number())),
+                    state: Some(format!("🔗 /help · harmony · ✦ cluster {}", shard_id.number())),
                     timestamps: None,
                     url: None,
                 };
@@ -60,7 +61,7 @@ impl ShardManager {
             },
         )
         .await
-        .map_err(|e| RailwayError::Internal(format!("Failed to create recommended shards: {}", e)))?;
+        .map_err(|e| HarmonyError::Internal(format!("Failed to create recommended shards: {}", e)))?;
 
         let shards: Vec<Shard> = shards_iter.collect();
 

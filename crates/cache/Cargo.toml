@@ -1,10 +1,10 @@
 [package]
-name = "railway-cache"
+name = "harmony-cache"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../common" }
+harmony-common = { path = "../common" }
 redis = { version = "0.27", features = ["tokio-comp"] }
 tokio = { version = "1.52", features = ["sync", "time"] }
 thiserror = "2"

@@ -1,5 +1,6 @@
-pub mod handlers;
-pub mod interaction;
-pub mod prefix;
-pub mod register;
-pub mod router;
+pub mod core;
+pub mod favorites;
+pub mod filters;
+pub mod lastfm;
+pub mod miscellaneous;
+pub mod music;

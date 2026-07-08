@@ -1,4 +1,4 @@
-use railway_common::error::RailwayError;
+use harmony_common::error::HarmonyError;
 use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
 
@@ -9,7 +9,7 @@ impl DistributedLock {
         conn: &mut MultiplexedConnection,
         key: &str,
         ttl_millis: u64,
-    ) -> Result<bool, RailwayError> {
+    ) -> Result<bool, HarmonyError> {
         let result: Option<String> = redis::cmd("SET")
             .arg(key)
             .arg("1")
@@ -18,13 +18,13 @@ impl DistributedLock {
             .arg(ttl_millis)
             .query_async(conn)
             .await
-            .map_err(RailwayError::Cache)?;
+            .map_err(HarmonyError::Cache)?;
 
         Ok(result.is_some())
     }
 
-    pub async fn release(conn: &mut MultiplexedConnection, key: &str) -> Result<(), RailwayError> {
-        let _: () = conn.del(key).await.map_err(RailwayError::Cache)?;
+    pub async fn release(conn: &mut MultiplexedConnection, key: &str) -> Result<(), HarmonyError> {
+        let _: () = conn.del(key).await.map_err(HarmonyError::Cache)?;
         Ok(())
     }
 }

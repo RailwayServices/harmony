@@ -1,10 +1,10 @@
 [package]
-name = "railway-database"
+name = "harmony-database"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../common" }
+harmony-common = { path = "../common" }
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros", "uuid", "chrono"] }
 tokio = { version = "1.52", features = ["sync", "macros"] }
 thiserror = "2"

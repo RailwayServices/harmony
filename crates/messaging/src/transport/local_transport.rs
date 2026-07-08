@@ -1,11 +1,12 @@
 use crate::publisher::Publisher;
 use crate::subscriber::Subscriber;
-use railway_common::error::RailwayError;
-use railway_common::event::RailwayEvent;
+use harmony_common::error::HarmonyError;
+use harmony_common::event::HarmonyEvent;
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 pub struct LocalTransport {
-    sender: broadcast::Sender<RailwayEvent>,
+    sender: broadcast::Sender<Arc<HarmonyEvent>>,
 }
 
 impl LocalTransport {
@@ -16,10 +17,10 @@ impl LocalTransport {
 }
 
 impl Publisher for LocalTransport {
-    async fn publish(&self, event: RailwayEvent) -> Result<(), RailwayError> {
+    async fn publish(&self, event: Arc<HarmonyEvent>) -> Result<(), HarmonyError> {
         if self.sender.receiver_count() > 0 {
             self.sender.send(event).map_err(|e| {
-                RailwayError::Internal(format!("Failed to publish local event: {}", e))
+                HarmonyError::Internal(format!("Failed to publish local event: {}", e))
             })?;
         }
         Ok(())
@@ -27,7 +28,7 @@ impl Publisher for LocalTransport {
 }
 
 impl Subscriber for LocalTransport {
-    async fn subscribe(&self) -> Result<broadcast::Receiver<RailwayEvent>, RailwayError> {
+    async fn subscribe(&self) -> Result<broadcast::Receiver<Arc<HarmonyEvent>>, HarmonyError> {
         Ok(self.sender.subscribe())
     }
 }

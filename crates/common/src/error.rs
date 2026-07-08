@@ -1,5 +1,5 @@
 #[derive(thiserror::Error, Debug)]
-pub enum RailwayError {
+pub enum HarmonyError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -22,13 +22,13 @@ pub enum RailwayError {
     Internal(String),
 }
 
-impl From<twilight_http::Error> for RailwayError {
+impl From<twilight_http::Error> for HarmonyError {
     fn from(err: twilight_http::Error) -> Self {
         Self::DiscordHttp(Box::new(err))
     }
 }
 
-impl From<twilight_http::response::DeserializeBodyError> for RailwayError {
+impl From<twilight_http::response::DeserializeBodyError> for HarmonyError {
     fn from(err: twilight_http::response::DeserializeBodyError) -> Self {
         Self::DiscordModel(Box::new(err))
     }

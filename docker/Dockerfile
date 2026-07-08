@@ -20,7 +20,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
 ENV SQLX_OFFLINE=true
-RUN cargo build --release --bin railway-bot
+RUN cargo build --release --bin harmony-bot --bin harmony-api
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y \
@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/railway-bot /usr/local/bin/
+COPY --from=builder /app/target/release/harmony-bot /usr/local/bin/
+COPY --from=builder /app/target/release/harmony-api /usr/local/bin/
 
-CMD ["railway-bot"]
+CMD ["harmony-bot"]

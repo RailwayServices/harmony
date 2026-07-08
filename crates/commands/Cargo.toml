@@ -1,16 +1,18 @@
 [package]
-name = "railway-commands"
+name = "harmony-commands"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../common" }
-railway-database = { path = "../database" }
-railway-cache = { path = "../cache" }
-railway-antinuke = { path = "../modules/antinuke" }
+harmony-common = { path = "../common" }
+harmony-database = { path = "../database" }
+harmony-cache = { path = "../cache" }
+harmony-modules = { path = "../modules" }
+lavende = "0.1.14"
 tokio = { version = "1.52", features = ["sync"] }
 thiserror = "2"
 tracing = "0.1"
+serde_json = "1"
 twilight-model = "0.17"
 twilight-http = "0.17"
 twilight-util = { version = "0.17", features = ["builder"] }

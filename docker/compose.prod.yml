@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: railway-postgres
+    container_name: harmony-postgres
     restart: unless-stopped
     environment:
       - POSTGRES_USER=waris
@@ -14,7 +14,7 @@ services:
 
   redis:
     image: redis:8.8.0-alpine
-    container_name: railway-redis
+    container_name: harmony-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -22,14 +22,31 @@ services:
       - redisdata:/data
 
   bot:
-    image: ghcr.io/railwayservices/railway:latest
-    container_name: railway-bot
+    image: ghcr.io/harmonyservices/harmony:latest
+    container_name: harmony-bot
     restart: unless-stopped
     env_file:
       - ../.env
     environment:
       - DATABASE_URL=postgresql://waris@postgres:5432/postgresx
       - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+
+  api:
+    image: ghcr.io/harmonyservices/harmony:latest
+    container_name: harmony-api
+    command: ["harmony-api"]
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql://waris@postgres:5432/postgresx
+      - REDIS_URL=redis://redis:6379
+      - API_PORT=3000
     depends_on:
       - postgres
       - redis

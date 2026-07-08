@@ -1,10 +1,10 @@
 [package]
-name = "railway-messaging"
+name = "harmony-messaging"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../common" }
+harmony-common = { path = "../common" }
 tokio = { version = "1.52", features = ["sync"] }
 thiserror = "2"
 tracing = "0.1"

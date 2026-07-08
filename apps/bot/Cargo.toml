@@ -1,16 +1,16 @@
 [package]
-name = "railway-bot"
+name = "harmony-bot"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../../crates/common" }
-railway-database = { path = "../../crates/database" }
-railway-cache = { path = "../../crates/cache" }
-railway-messaging = { path = "../../crates/messaging" }
-railway-gateway = { path = "../../crates/gateway" }
-railway-modules-registry = { path = "../../crates/modules/registry" }
-railway-commands = { path = "../../crates/commands" }
+harmony-common = { path = "../../crates/common" }
+harmony-database = { path = "../../crates/database" }
+harmony-cache = { path = "../../crates/cache" }
+harmony-messaging = { path = "../../crates/messaging" }
+harmony-gateway = { path = "../../crates/gateway" }
+harmony-modules = { path = "../../crates/modules" }
+harmony-commands = { path = "../../crates/commands" }
 tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "signal"] }
 twilight-http = "0.17"
 tracing = "0.1"
@@ -20,3 +20,5 @@ redis = "0.27"
 rustls = { version = "0.23", features = ["ring"] }
 serde_json = "1.0.150"
 twilight-model = "0.17"
+dotenvy = "0.15.7"
+tracing-appender = "0.2"

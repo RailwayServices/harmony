@@ -1,6 +1,6 @@
-use railway_common::error::RailwayError;
-use railway_common::event::RailwayEvent;
-use railway_messaging::publisher::Publisher;
+use harmony_common::error::HarmonyError;
+use harmony_common::event::HarmonyEvent;
+use harmony_messaging::publisher::Publisher;
 use std::sync::Arc;
 
 pub struct EventDispatcher<P: Publisher> {
@@ -12,7 +12,7 @@ impl<P: Publisher> EventDispatcher<P> {
         Self { publisher }
     }
 
-    pub async fn dispatch(&self, event: RailwayEvent) -> Result<(), RailwayError> {
-        self.publisher.publish(event).await
+    pub async fn dispatch(&self, event: HarmonyEvent) -> Result<(), HarmonyError> {
+        self.publisher.publish(Arc::new(event)).await
     }
 }

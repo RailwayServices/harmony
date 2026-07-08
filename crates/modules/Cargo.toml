@@ -1,0 +1,17 @@
+[package]
+name = "harmony-modules"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+harmony-common = { path = "../common" }
+lavende = "1.0.0"
+twilight-model = "0.17"
+twilight-http = "0.17"
+tokio = { version = "1.52", features = ["full"] }
+async-trait = "0.1"
+serde_json = "1"
+tracing = "0.1"
+dashmap = "5.5.3"
+twilight-util = { version = "0.17", features = ["builder"] }
+harmony-database = { path = "../database" }

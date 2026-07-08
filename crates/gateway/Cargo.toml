@@ -1,11 +1,11 @@
 [package]
-name = "railway-gateway"
+name = "harmony-gateway"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-railway-common = { path = "../common" }
-railway-messaging = { path = "../messaging" }
+harmony-common = { path = "../common" }
+harmony-messaging = { path = "../messaging" }
 twilight-gateway = { version = "0.17", default-features = false, features = ["twilight-http", "simd-json", "rustls-native-roots"] }
 twilight-model = "0.17"
 twilight-http = "0.17"

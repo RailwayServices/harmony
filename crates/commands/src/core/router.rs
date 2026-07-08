@@ -1,0 +1,70 @@
+use crate::core::interaction::InteractionContext;
+use crate::core::prefix::PrefixRouter;
+use harmony_common::error::HarmonyError;
+use harmony_common::module::ModuleContext;
+
+pub struct CommandRouter {
+    prefix_router: PrefixRouter,
+}
+
+impl CommandRouter {
+    pub fn new(prefix: String) -> Self {
+        Self { prefix_router: PrefixRouter::new(prefix) }
+    }
+
+    pub async fn handle_event(
+        &self,
+        event: &harmony_common::event::HarmonyEvent,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        if let harmony_common::event::HarmonyEvent::Discord(arc_event) = event {
+            if let twilight_model::gateway::event::Event::InteractionCreate(interaction) =
+                arc_event.as_ref()
+            {
+                let interaction_ctx = InteractionContext::new(interaction.0.clone());
+                return self.route(&interaction_ctx, module_ctx).await;
+            }
+            if let twilight_model::gateway::event::Event::MessageCreate(msg) = arc_event.as_ref() {
+                return self.prefix_router.handle_message(&msg.0, module_ctx).await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn route(
+        &self,
+        interaction_ctx: &InteractionContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        if interaction_ctx.is_component() {
+            let custom_id = interaction_ctx.extract_custom_id()?;
+            return self.handle_interaction(interaction_ctx, custom_id, module_ctx).await;
+        }
+
+        let name = interaction_ctx.extract_command_name()?;
+
+        match name {
+            "play" => crate::music::play::handle(interaction_ctx, module_ctx).await,
+            "stop" => crate::music::control::handle_stop(interaction_ctx, module_ctx).await,
+            "skip" => crate::music::control::handle_skip(interaction_ctx, module_ctx).await,
+            "pause" => crate::music::control::handle_pause(interaction_ctx, module_ctx).await,
+            "resume" => crate::music::control::handle_resume(interaction_ctx, module_ctx).await,
+            "volume" => crate::music::control::handle_volume(interaction_ctx, module_ctx).await,
+            "filter" => crate::music::filter::handle_filter(interaction_ctx, module_ctx).await,
+            "queue" => crate::music::queue::handle_queue(interaction_ctx, module_ctx).await,
+            other => {
+                tracing::debug!("Received unknown command '{}', ignoring.", other);
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn handle_interaction(
+        &self,
+        _interaction_ctx: &InteractionContext,
+        _custom_id: &str,
+        _module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        Ok(())
+    }
+}

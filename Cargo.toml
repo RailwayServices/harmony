@@ -5,11 +5,10 @@ members = [
     "crates/cache",
     "crates/messaging",
     "crates/gateway",
-    "crates/modules/registry",
-    "crates/modules/antinuke",
     "crates/commands",
-    "apps/bot",
+    "apps/bot", "crates/modules", "apps/api",
 ]
+default-members = ["apps/bot"]
 resolver = "2"
 
 [profile.release]

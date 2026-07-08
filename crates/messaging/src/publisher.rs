@@ -1,9 +1,10 @@
-use railway_common::error::RailwayError;
-use railway_common::event::RailwayEvent;
+use harmony_common::error::HarmonyError;
+use harmony_common::event::HarmonyEvent;
+use std::sync::Arc;
 
 pub trait Publisher: Send + Sync {
     fn publish(
         &self,
-        event: RailwayEvent,
-    ) -> impl std::future::Future<Output = Result<(), RailwayError>> + Send;
+        event: Arc<HarmonyEvent>,
+    ) -> impl std::future::Future<Output = Result<(), HarmonyError>> + Send;
 }
