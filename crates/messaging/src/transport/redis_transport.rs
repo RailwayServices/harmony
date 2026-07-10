@@ -3,10 +3,10 @@ use crate::subscriber::Subscriber;
 use futures::StreamExt;
 use harmony_common::error::HarmonyError;
 use harmony_common::event::HarmonyEvent;
-use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
+use redis::aio::MultiplexedConnection;
 use std::sync::Arc;
-use tokio::sync::{broadcast, OnceCell};
+use tokio::sync::{OnceCell, broadcast};
 use tracing::{error, info};
 
 pub struct RedisTransport {
@@ -77,10 +77,10 @@ impl Subscriber for RedisTransport {
                             if let Ok(payload) = msg.get_payload::<String>() {
                                 match serde_json::from_str::<HarmonyEvent>(&payload) {
                                     Ok(event) => {
-                                        if tx.receiver_count() > 0 {
-                                            if let Err(e) = tx.send(Arc::new(event)) {
-                                                error!("Local broadcast failed: {}", e);
-                                            }
+                                        if tx.receiver_count() > 0
+                                            && let Err(e) = tx.send(Arc::new(event))
+                                        {
+                                            error!("Local broadcast failed: {}", e);
                                         }
                                     }
                                     Err(e) => {

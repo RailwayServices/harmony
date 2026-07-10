@@ -2,8 +2,8 @@ use harmony_common::error::HarmonyError;
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 use twilight_http::Client as HttpClient;
-use twilight_model::id::marker::ApplicationMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::ApplicationMarker;
 use twilight_util::builder::command::{CommandBuilder, IntegerBuilder, StringBuilder};
 
 static APP_ID: OnceCell<Id<ApplicationMarker>> = OnceCell::const_new();

@@ -47,11 +47,10 @@ impl InteractionContext {
         ) = &self.interaction.data
         {
             for opt in &cmd.options {
-                if opt.name == name {
-                    if let twilight_model::application::interaction::application_command::CommandOptionValue::String(s) = &opt.value {
+                if opt.name == name
+                    && let twilight_model::application::interaction::application_command::CommandOptionValue::String(s) = &opt.value {
                         return Some(s.clone());
                     }
-                }
             }
         }
         None
@@ -63,14 +62,32 @@ impl InteractionContext {
         ) = &self.interaction.data
         {
             for opt in &cmd.options {
-                if opt.name == name {
-                    if let twilight_model::application::interaction::application_command::CommandOptionValue::Integer(i) = &opt.value {
+                if opt.name == name
+                    && let twilight_model::application::interaction::application_command::CommandOptionValue::Integer(i) = &opt.value {
                         return Some(*i);
                     }
-                }
             }
         }
         None
+    }
+
+    pub async fn defer_update(
+        &self,
+        module_ctx: &harmony_common::module::ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        let interaction_client = module_ctx.discord.interaction(self.interaction.application_id);
+
+        let response = twilight_model::http::interaction::InteractionResponse {
+            kind: twilight_model::http::interaction::InteractionResponseType::DeferredUpdateMessage,
+            data: None,
+        };
+
+        interaction_client
+            .create_response(self.interaction.id, &self.interaction.token, &response)
+            .await
+            .map_err(|e| HarmonyError::Internal(e.to_string()))?;
+
+        Ok(())
     }
 
     pub async fn defer(

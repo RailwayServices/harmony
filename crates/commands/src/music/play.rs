@@ -4,8 +4,8 @@ use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
 use harmony_modules::MUSIC_RESPONSES;
 use lavende::LoadResult;
-use tokio::time::{timeout, Duration};
-use twilight_util::builder::embed::EmbedBuilder;
+use tokio::time::{Duration, timeout};
+use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
 pub async fn handle(
     interaction_ctx: &InteractionContext,
@@ -68,7 +68,7 @@ pub async fn handle(
         req_id: req_id.clone(),
         guild_id: guild_id.to_string(),
         channel_id: channel_id.to_string(),
-        text_channel_id,
+        text_channel_id: text_channel_id.clone(),
         query: search_query,
     };
 
@@ -78,6 +78,11 @@ pub async fn handle(
         use redis::AsyncCommands;
         let mut redis_conn = module_ctx.cache.clone();
         let _: Result<(), _> = redis_conn.publish("harmony:music:requests", payload).await;
+
+        if let Some(txt_id) = &text_channel_id {
+            let _: Result<(), _> =
+                redis_conn.hset("harmony:player:channel", guild_id.to_string(), txt_id).await;
+        }
     }
 
     let response = match timeout(Duration::from_secs(15), rx).await {
@@ -103,22 +108,27 @@ pub async fn handle(
                 let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
             }
             LoadResult::Track(track) => {
-                let embed = EmbedBuilder::new()
-                    .description(format!("✅ **{}** by {}", track.info.title, track.info.author))
-                    .color(module_ctx.embed_color)
-                    .build();
-                let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+                let mut builder = EmbedBuilder::new()
+                    .description(format!("✅ Added to queue: **{}**", track.info.title))
+                    .color(module_ctx.embed_color);
+                if let Some(thumb) = &track.info.artwork_url
+                    && let Ok(src) = ImageSource::url(thumb.clone())
+                {
+                    builder = builder.thumbnail(src);
+                }
+                let _ = interaction_ctx.edit_embed(builder.build(), module_ctx).await;
             }
             LoadResult::Search(tracks) => {
                 if let Some(track) = tracks.first() {
-                    let embed = EmbedBuilder::new()
-                        .description(format!(
-                            "✅ **{}** by {}",
-                            track.info.title, track.info.author
-                        ))
-                        .color(module_ctx.embed_color)
-                        .build();
-                    let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+                    let mut builder = EmbedBuilder::new()
+                        .description(format!("✅ Added to queue: **{}**", track.info.title))
+                        .color(module_ctx.embed_color);
+                    if let Some(thumb) = &track.info.artwork_url
+                        && let Ok(src) = ImageSource::url(thumb.clone())
+                    {
+                        builder = builder.thumbnail(src);
+                    }
+                    let _ = interaction_ctx.edit_embed(builder.build(), module_ctx).await;
                 }
             }
             LoadResult::Playlist(playlist) => {

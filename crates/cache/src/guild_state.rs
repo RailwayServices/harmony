@@ -1,6 +1,6 @@
 use harmony_common::error::HarmonyError;
-use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
+use redis::aio::MultiplexedConnection;
 use serde::{Deserialize, Serialize};
 
 pub struct GuildStateCache {}

@@ -1,6 +1,6 @@
 use harmony_common::error::HarmonyError;
-use redis::aio::MultiplexedConnection;
 use redis::Client;
+use redis::aio::MultiplexedConnection;
 
 #[derive(Clone)]
 pub struct CacheClient {

@@ -62,10 +62,14 @@ impl CommandRouter {
 
     pub async fn handle_interaction(
         &self,
-        _interaction_ctx: &InteractionContext,
+        interaction_ctx: &InteractionContext,
         _custom_id: &str,
-        _module_ctx: &ModuleContext,
+        module_ctx: &ModuleContext,
     ) -> Result<(), HarmonyError> {
+        // music_stop and music_skip are now handled natively by the Gateway
+
+        // Defer update so any unhandled button doesn't show "Interaction Failed"
+        let _ = interaction_ctx.defer_update(module_ctx).await;
         Ok(())
     }
 }
