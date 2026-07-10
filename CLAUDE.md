@@ -8,7 +8,7 @@ This document is the single source of truth for building and maintaining **Harmo
 
 - **Project name:** `harmony`
 - **Bot name:** Harmony
-- **Primary language:** Rust (2021 edition, MSRV 1.80+)
+- **Primary language:** Rust (2024 edition, MSRV 1.96.1)
 - **Architecture style:** Microservices (Cargo workspace)
 - **Discord library:** `twilight` ecosystem
 - **Inter-service Transport:** Redis Pub/Sub (`RedisTransport`)

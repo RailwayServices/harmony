@@ -12,6 +12,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+rust-version = "1.96.1"
+
 [profile.release]
 opt-level = 3
 lto = "fat"
