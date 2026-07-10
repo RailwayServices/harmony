@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 harmony-common = { path = "../common" }
-lavende = "1.0.0"
 twilight-model = "0.17"
 twilight-http = "0.17"
 tokio = { version = "1.52", features = ["full"] }
@@ -17,3 +16,4 @@ twilight-util = { version = "0.17", features = ["builder"] }
 harmony-database = { path = "../database" }
 redis = { version = "0.27", features = ["aio", "tokio-comp"] }
 serde = { version = "1.0", features = ["derive"] }
+futures = "0.3.32"

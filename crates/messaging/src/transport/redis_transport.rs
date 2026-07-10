@@ -3,13 +3,15 @@ use crate::subscriber::Subscriber;
 use futures::StreamExt;
 use harmony_common::error::HarmonyError;
 use harmony_common::event::HarmonyEvent;
+use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, OnceCell};
 use tracing::{error, info};
 
 pub struct RedisTransport {
     client: redis::Client,
+    pub_conn: OnceCell<MultiplexedConnection>,
     publish_channel: String,
     subscribe_channel: String,
     capacity: usize,
@@ -25,6 +27,7 @@ impl RedisTransport {
         let client = redis::Client::open(redis_url).map_err(HarmonyError::Cache)?;
         Ok(Self {
             client,
+            pub_conn: OnceCell::new(),
             publish_channel: publish_channel.to_string(),
             subscribe_channel: subscribe_channel.to_string(),
             capacity,
@@ -34,8 +37,14 @@ impl RedisTransport {
 
 impl Publisher for RedisTransport {
     async fn publish(&self, event: Arc<HarmonyEvent>) -> Result<(), HarmonyError> {
-        let mut conn =
-            self.client.get_multiplexed_async_connection().await.map_err(HarmonyError::Cache)?;
+        let conn_ref = self
+            .pub_conn
+            .get_or_try_init(|| async { self.client.get_multiplexed_async_connection().await })
+            .await
+            .map_err(HarmonyError::Cache)?;
+
+        let mut conn = conn_ref.clone();
+
         let serialized = serde_json::to_string(&*event).map_err(|e| {
             HarmonyError::Internal(format!("Failed to serialize event for Redis: {}", e))
         })?;

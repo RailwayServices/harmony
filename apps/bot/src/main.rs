@@ -5,7 +5,7 @@ use harmony_common::module::{Module, ModuleContext};
 use harmony_database::pool::Database;
 use harmony_messaging::subscriber::Subscriber;
 use harmony_messaging::transport::redis_transport::RedisTransport;
-use harmony_modules::{MusicModule, LAVENDE_MANAGER};
+use harmony_modules::MusicModule;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::broadcast::error::RecvError;
@@ -95,58 +95,7 @@ async fn main() -> Result<(), HarmonyError> {
         event_tx: event_tx.clone(),
     });
 
-    let registry = Arc::new(MusicModule::new(module_ctx.clone()));
-
-    {
-        use redis::AsyncCommands;
-        let mut redis_conn = module_ctx.cache.clone();
-        if let Ok(keys) = redis_conn.keys::<_, Vec<String>>("harmony:player_state:*").await {
-            let manager_opt = LAVENDE_MANAGER.get();
-            if let Some(manager) = manager_opt {
-                let dummy = manager.get_or_create_player("1");
-                tokio::spawn(async move {
-                    let _ = dummy.search("warmup").await;
-                    manager.destroy_player("1").await;
-                });
-
-                for key in keys {
-                    if let Ok(json_str) = redis_conn.get::<_, String>(&key).await {
-                        if let Ok(payload) = serde_json::from_str::<
-                            harmony_modules::state_sync::PlayerStatePayload,
-                        >(&json_str)
-                        {
-                            let guild_id = payload.guild_id.clone();
-                            let player = manager.get_or_create_player(&guild_id);
-                            let was_paused = payload.paused;
-                            let voice_channel_id = payload.voice_channel_id.clone();
-                            harmony_modules::state_sync::restore_player_state(
-                                &guild_id, &player, payload,
-                            )
-                            .await;
-                            tracing::info!(
-                                "[STATE_SYNC] Restored player state for guild {}",
-                                guild_id
-                            );
-
-                            if let Some(vc_id) = voice_channel_id {
-                                let p = player.clone();
-                                tokio::spawn(async move {
-                                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                                    let _ = p.connect(Some(vc_id), true, false).await;
-
-                                    if !was_paused {
-                                        tokio::time::sleep(std::time::Duration::from_millis(1000))
-                                            .await;
-                                        let _ = p.play().await;
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let registry = Arc::new(MusicModule::new(module_ctx.clone(), config.redis_url.clone()));
 
     let mut rx = redis_transport.subscribe().await?;
     let registry_ctx = module_ctx.clone();
@@ -237,16 +186,7 @@ async fn main() -> Result<(), HarmonyError> {
 
     match signal::ctrl_c().await {
         Ok(()) => {
-            info!("[SYSTEM] Shutdown signal received. Destroying all active players...");
-            if let Some(manager) = LAVENDE_MANAGER.get() {
-                let guild_ids: Vec<String> =
-                    manager.players.iter().map(|e| e.key().clone()).collect();
-                for guild_id in guild_ids {
-                    manager.destroy_player(&guild_id).await;
-                }
-                info!("[SYSTEM] All players destroyed.");
-            }
-            info!("[SYSTEM] Exiting gracefully.");
+            info!("[SYSTEM] Shutdown signal received. Exiting gracefully.");
         }
         Err(err) => error!("[SYSTEM] Unable to listen for shutdown signal: {}", err),
     }
