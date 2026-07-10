@@ -1,6 +1,6 @@
 use harmony_common::error::HarmonyError;
-use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
+use redis::aio::MultiplexedConnection;
 
 pub struct RateLimiter {}
 

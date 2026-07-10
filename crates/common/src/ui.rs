@@ -1,5 +1,5 @@
-use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle, Component};
 use twilight_model::channel::message::Embed;
+use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle, Component};
 use twilight_util::builder::embed::EmbedBuilder;
 
 pub fn build_stylish_embed(title: &str, description: &str, color: u32) -> Embed {

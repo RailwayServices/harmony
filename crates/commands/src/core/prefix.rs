@@ -2,11 +2,11 @@ use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use std::sync::Arc;
 use twilight_http::Client as HttpClient;
-use twilight_model::channel::message::component::Component;
-use twilight_model::channel::message::Embed;
 use twilight_model::channel::Message;
-use twilight_model::id::marker::GuildMarker;
+use twilight_model::channel::message::Embed;
+use twilight_model::channel::message::component::Component;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 pub struct PrefixContext {
     pub message: Message,

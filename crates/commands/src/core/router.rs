@@ -63,20 +63,12 @@ impl CommandRouter {
     pub async fn handle_interaction(
         &self,
         interaction_ctx: &InteractionContext,
-        custom_id: &str,
+        _custom_id: &str,
         module_ctx: &ModuleContext,
     ) -> Result<(), HarmonyError> {
-        match custom_id {
-            "music_stop" => {
-                let _ = crate::music::control::handle_stop(interaction_ctx, module_ctx).await;
-            }
-            "music_skip" => {
-                let _ = crate::music::control::handle_skip(interaction_ctx, module_ctx).await;
-            }
-            _ => {}
-        }
+        // music_stop and music_skip are now handled natively by the Gateway
 
-        // Defer update so the button doesn't show "Interaction Failed"
+        // Defer update so any unhandled button doesn't show "Interaction Failed"
         let _ = interaction_ctx.defer_update(module_ctx).await;
         Ok(())
     }

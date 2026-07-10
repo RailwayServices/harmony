@@ -8,8 +8,8 @@ use harmony_messaging::transport::redis_transport::RedisTransport;
 use harmony_modules::MusicModule;
 use std::sync::Arc;
 use tokio::signal;
-use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::Semaphore;
+use tokio::sync::broadcast::error::RecvError;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use twilight_http::Client as DiscordClient;
@@ -123,7 +123,10 @@ async fn main() -> Result<(), HarmonyError> {
                     });
                 }
                 Err(RecvError::Lagged(n)) => {
-                    warn!("[MODULES] Event bus lagged — {} events dropped. Increase EVENT_BUS_CAPACITY.", n);
+                    warn!(
+                        "[MODULES] Event bus lagged — {} events dropped. Increase EVENT_BUS_CAPACITY.",
+                        n
+                    );
                 }
                 Err(RecvError::Closed) => {
                     error!("[MODULES] Event bus closed unexpectedly.");
@@ -160,7 +163,10 @@ async fn main() -> Result<(), HarmonyError> {
                     });
                 }
                 Err(RecvError::Lagged(n)) => {
-                    warn!("[COMMANDS] Event bus lagged — {} events dropped. Increase EVENT_BUS_CAPACITY.", n);
+                    warn!(
+                        "[COMMANDS] Event bus lagged — {} events dropped. Increase EVENT_BUS_CAPACITY.",
+                        n
+                    );
                 }
                 Err(RecvError::Closed) => {
                     error!("[COMMANDS] Event bus closed unexpectedly.");

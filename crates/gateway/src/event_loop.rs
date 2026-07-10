@@ -120,21 +120,21 @@ impl<P: Publisher + 'static> EventLoop<P> {
 
                             let harmony_event = HarmonyEvent::from(event);
 
-                            if let HarmonyEvent::Discord(ref arc_event) = harmony_event {
-                                if is_voice_critical(arc_event) {
-                                    let dispatcher = Arc::clone(&dispatcher);
-                                    let harmony_event = harmony_event.clone();
-                                    tokio::spawn(async move {
-                                        if let Err(e) = dispatcher.dispatch(harmony_event).await {
-                                            error!(
-                                                "Failed to dispatch voice event on shard {}: {}",
-                                                shard_id.number(),
-                                                e
-                                            );
-                                        }
-                                    });
-                                    continue;
-                                }
+                            if let HarmonyEvent::Discord(ref arc_event) = harmony_event
+                                && is_voice_critical(arc_event)
+                            {
+                                let dispatcher = Arc::clone(&dispatcher);
+                                let harmony_event = harmony_event.clone();
+                                tokio::spawn(async move {
+                                    if let Err(e) = dispatcher.dispatch(harmony_event).await {
+                                        error!(
+                                            "Failed to dispatch voice event on shard {}: {}",
+                                            shard_id.number(),
+                                            e
+                                        );
+                                    }
+                                });
+                                continue;
                             }
 
                             let dispatcher = Arc::clone(&dispatcher);

@@ -4,7 +4,7 @@ use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
 use harmony_modules::MUSIC_RESPONSES;
 use lavende::LoadResult;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
 pub async fn handle(
@@ -111,10 +111,10 @@ pub async fn handle(
                 let mut builder = EmbedBuilder::new()
                     .description(format!("✅ Added to queue: **{}**", track.info.title))
                     .color(module_ctx.embed_color);
-                if let Some(thumb) = &track.info.artwork_url {
-                    if let Ok(src) = ImageSource::url(thumb.clone()) {
-                        builder = builder.thumbnail(src);
-                    }
+                if let Some(thumb) = &track.info.artwork_url
+                    && let Ok(src) = ImageSource::url(thumb.clone())
+                {
+                    builder = builder.thumbnail(src);
                 }
                 let _ = interaction_ctx.edit_embed(builder.build(), module_ctx).await;
             }
@@ -123,10 +123,10 @@ pub async fn handle(
                     let mut builder = EmbedBuilder::new()
                         .description(format!("✅ Added to queue: **{}**", track.info.title))
                         .color(module_ctx.embed_color);
-                    if let Some(thumb) = &track.info.artwork_url {
-                        if let Ok(src) = ImageSource::url(thumb.clone()) {
-                            builder = builder.thumbnail(src);
-                        }
+                    if let Some(thumb) = &track.info.artwork_url
+                        && let Ok(src) = ImageSource::url(thumb.clone())
+                    {
+                        builder = builder.thumbnail(src);
                     }
                     let _ = interaction_ctx.edit_embed(builder.build(), module_ctx).await;
                 }

@@ -47,11 +47,10 @@ impl InteractionContext {
         ) = &self.interaction.data
         {
             for opt in &cmd.options {
-                if opt.name == name {
-                    if let twilight_model::application::interaction::application_command::CommandOptionValue::String(s) = &opt.value {
+                if opt.name == name
+                    && let twilight_model::application::interaction::application_command::CommandOptionValue::String(s) = &opt.value {
                         return Some(s.clone());
                     }
-                }
             }
         }
         None
@@ -63,11 +62,10 @@ impl InteractionContext {
         ) = &self.interaction.data
         {
             for opt in &cmd.options {
-                if opt.name == name {
-                    if let twilight_model::application::interaction::application_command::CommandOptionValue::Integer(i) = &opt.value {
+                if opt.name == name
+                    && let twilight_model::application::interaction::application_command::CommandOptionValue::Integer(i) = &opt.value {
                         return Some(*i);
                     }
-                }
             }
         }
         None

@@ -1340,6 +1340,7 @@ name = "harmony-gateway-app"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
+ "futures",
  "harmony-common",
  "harmony-gateway",
  "harmony-messaging",

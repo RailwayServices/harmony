@@ -3,7 +3,7 @@ use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
 use harmony_modules::MUSIC_RESPONSES;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use twilight_util::builder::embed::EmbedBuilder;
 
 fn format_duration(ms: u64) -> String {

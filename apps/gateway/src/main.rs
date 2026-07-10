@@ -92,146 +92,130 @@ async fn main() -> Result<(), HarmonyError> {
     let redis_url_clone = config.redis_url.clone();
     let discord_clone = discord.clone();
     tokio::spawn(async move {
-        if let Ok(client) = redis::Client::open(redis_url_clone) {
-            if let Ok(mut con) = client.get_multiplexed_async_connection().await
+        if let Ok(client) = redis::Client::open(redis_url_clone)
+            && let Ok(mut con) = client.get_multiplexed_async_connection().await
                 as Result<redis::aio::MultiplexedConnection, _>
-            {
-                use harmony_common::music_ipc::NowPlayingUiTemplate;
-                use redis::AsyncCommands;
-                use twilight_model::channel::message::component::{
-                    ActionRow, Button, ButtonStyle, Component,
-                };
-                use twilight_model::channel::message::EmojiReactionType;
-                use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
+        {
+            use harmony_common::music_ipc::NowPlayingUiTemplate;
+            use redis::AsyncCommands;
+            use twilight_model::channel::message::EmojiReactionType;
+            use twilight_model::channel::message::component::{
+                ActionRow, Button, ButtonStyle, Component,
+            };
+            use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
-                while let Ok(event) = event_rx_lavende.recv().await {
-                    match event {
-                        lavende::LavendeEvent::TrackStart { guild_id, track } => {
-                            let channel_id_str: Option<String> =
-                                con.hget("harmony:player:channel", &guild_id).await.unwrap_or(None);
-                            if let Some(c_id_str) = channel_id_str {
-                                if let Ok(channel_id) = c_id_str.parse::<u64>() {
-                                    let channel_marker = twilight_model::id::Id::new(channel_id);
+            while let Ok(event) = event_rx_lavende.recv().await {
+                match event {
+                    lavende::LavendeEvent::TrackStart { guild_id, track } => {
+                        let channel_id_str: Option<String> =
+                            con.hget("harmony:player:channel", &guild_id).await.unwrap_or(None);
+                        if let Some(c_id_str) = channel_id_str
+                            && let Ok(channel_id) = c_id_str.parse::<u64>()
+                        {
+                            let channel_marker = twilight_model::id::Id::new(channel_id);
 
-                                    let old_msg_id_str: Option<String> = con
-                                        .hget("harmony:player:np_msg", &guild_id)
-                                        .await
-                                        .unwrap_or(None);
-                                    if let Some(msg_id_str) = old_msg_id_str {
-                                        if let Ok(msg_id) = msg_id_str.parse::<u64>() {
-                                            let _ = discord_clone
-                                                .delete_message(
-                                                    channel_marker,
-                                                    twilight_model::id::Id::new(msg_id),
-                                                )
-                                                .await;
-                                        }
-                                    }
+                            let old_msg_id_str: Option<String> =
+                                con.hget("harmony:player:np_msg", &guild_id).await.unwrap_or(None);
+                            if let Some(msg_id_str) = old_msg_id_str
+                                && let Ok(msg_id) = msg_id_str.parse::<u64>()
+                            {
+                                let _ = discord_clone
+                                    .delete_message(
+                                        channel_marker,
+                                        twilight_model::id::Id::new(msg_id),
+                                    )
+                                    .await;
+                            }
 
-                                    let template_str: Option<String> =
-                                        con.get("harmony:ui:nowplaying").await.unwrap_or(None);
-                                    if let Some(t_str) = template_str {
-                                        if let Ok(template) =
-                                            serde_json::from_str::<NowPlayingUiTemplate>(&t_str)
-                                        {
-                                            let desc = template
-                                                .description
-                                                .replace("{title}", &track.info.title)
-                                                .replace(
-                                                    "{url}",
-                                                    &track.info.uri.unwrap_or_default(),
-                                                )
-                                                .replace("{author}", &track.info.author);
+                            let template_str: Option<String> =
+                                con.get("harmony:ui:nowplaying").await.unwrap_or(None);
+                            if let Some(t_str) = template_str
+                                && let Ok(template) =
+                                    serde_json::from_str::<NowPlayingUiTemplate>(&t_str)
+                            {
+                                let desc = template
+                                    .description
+                                    .replace("{title}", &track.info.title)
+                                    .replace("{url}", &track.info.uri.unwrap_or_default())
+                                    .replace("{author}", &track.info.author);
 
-                                            let mut builder = EmbedBuilder::new()
-                                                .description(desc)
-                                                .color(template.color);
+                                let mut builder =
+                                    EmbedBuilder::new().description(desc).color(template.color);
 
-                                            if let Some(thumb) = track.info.artwork_url {
-                                                if let Ok(src) = ImageSource::url(thumb) {
-                                                    builder = builder.thumbnail(src);
-                                                }
-                                            }
-                                            let embed = builder.build();
+                                if let Some(thumb) = track.info.artwork_url
+                                    && let Ok(src) = ImageSource::url(thumb)
+                                {
+                                    builder = builder.thumbnail(src);
+                                }
+                                let embed = builder.build();
 
-                                            let mut components = Vec::new();
-                                            for btn in template.buttons {
-                                                let style = match btn.style {
-                                                    1 => ButtonStyle::Primary,
-                                                    2 => ButtonStyle::Secondary,
-                                                    3 => ButtonStyle::Success,
-                                                    4 => ButtonStyle::Danger,
-                                                    _ => ButtonStyle::Secondary,
-                                                };
-                                                components.push(Component::Button(Button {
-                                                    id: None,
-                                                    custom_id: Some(btn.custom_id),
-                                                    disabled: false,
-                                                    emoji: Some(EmojiReactionType::Unicode {
-                                                        name: btn.emoji,
-                                                    }),
-                                                    label: Some(btn.label),
-                                                    style,
-                                                    url: None,
-                                                    sku_id: None,
-                                                }));
-                                            }
+                                let mut components = Vec::new();
+                                for btn in template.buttons {
+                                    let style = match btn.style {
+                                        1 => ButtonStyle::Primary,
+                                        2 => ButtonStyle::Secondary,
+                                        3 => ButtonStyle::Success,
+                                        4 => ButtonStyle::Danger,
+                                        _ => ButtonStyle::Secondary,
+                                    };
+                                    components.push(Component::Button(Button {
+                                        id: None,
+                                        custom_id: Some(btn.custom_id),
+                                        disabled: false,
+                                        emoji: Some(EmojiReactionType::Unicode { name: btn.emoji }),
+                                        label: Some(btn.label),
+                                        style,
+                                        url: None,
+                                        sku_id: None,
+                                    }));
+                                }
 
-                                            let action_row =
-                                                vec![Component::ActionRow(ActionRow {
-                                                    id: None,
-                                                    components,
-                                                })];
+                                let action_row =
+                                    vec![Component::ActionRow(ActionRow { id: None, components })];
 
-                                            if let Ok(msg) = discord_clone
-                                                .create_message(channel_marker)
-                                                .embeds(&[embed])
-                                                .components(&action_row)
-                                                .await
-                                            {
-                                                if let Ok(msg_model) = msg.model().await {
-                                                    let _: Result<(), _> = con
-                                                        .hset(
-                                                            "harmony:player:np_msg",
-                                                            &guild_id,
-                                                            msg_model.id.get().to_string(),
-                                                        )
-                                                        .await;
-                                                }
-                                            }
-                                        }
-                                    }
+                                if let Ok(msg) = discord_clone
+                                    .create_message(channel_marker)
+                                    .embeds(&[embed])
+                                    .components(&action_row)
+                                    .await
+                                    && let Ok(msg_model) = msg.model().await
+                                {
+                                    let _: Result<(), _> = con
+                                        .hset(
+                                            "harmony:player:np_msg",
+                                            &guild_id,
+                                            msg_model.id.get().to_string(),
+                                        )
+                                        .await;
                                 }
                             }
                         }
-                        lavende::LavendeEvent::TrackEnd { guild_id, .. }
-                        | lavende::LavendeEvent::PlayerDestroy { guild_id, .. } => {
-                            let channel_id_str: Option<String> =
-                                con.hget("harmony:player:channel", &guild_id).await.unwrap_or(None);
-                            if let Some(c_id_str) = channel_id_str {
-                                if let Ok(channel_id) = c_id_str.parse::<u64>() {
-                                    let channel_marker = twilight_model::id::Id::new(channel_id);
-                                    let old_msg_id_str: Option<String> = con
-                                        .hget("harmony:player:np_msg", &guild_id)
-                                        .await
-                                        .unwrap_or(None);
-                                    if let Some(msg_id_str) = old_msg_id_str {
-                                        if let Ok(msg_id) = msg_id_str.parse::<u64>() {
-                                            let _ = discord_clone
-                                                .delete_message(
-                                                    channel_marker,
-                                                    twilight_model::id::Id::new(msg_id),
-                                                )
-                                                .await;
-                                        }
-                                        let _: Result<(), _> =
-                                            con.hdel("harmony:player:np_msg", &guild_id).await;
-                                    }
-                                }
-                            }
-                        }
-                        _ => {}
                     }
+                    lavende::LavendeEvent::TrackEnd { guild_id, .. }
+                    | lavende::LavendeEvent::PlayerDestroy { guild_id, .. } => {
+                        let channel_id_str: Option<String> =
+                            con.hget("harmony:player:channel", &guild_id).await.unwrap_or(None);
+                        if let Some(c_id_str) = channel_id_str
+                            && let Ok(channel_id) = c_id_str.parse::<u64>()
+                        {
+                            let channel_marker = twilight_model::id::Id::new(channel_id);
+                            let old_msg_id_str: Option<String> =
+                                con.hget("harmony:player:np_msg", &guild_id).await.unwrap_or(None);
+                            if let Some(msg_id_str) = old_msg_id_str {
+                                if let Ok(msg_id) = msg_id_str.parse::<u64>() {
+                                    let _ = discord_clone
+                                        .delete_message(
+                                            channel_marker,
+                                            twilight_model::id::Id::new(msg_id),
+                                        )
+                                        .await;
+                                }
+                                let _: Result<(), _> =
+                                    con.hdel("harmony:player:np_msg", &guild_id).await;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -240,6 +224,59 @@ async fn main() -> Result<(), HarmonyError> {
     info!("[GATEWAY] Initializing Shard Manager...");
     let shard_manager = ShardManager::new(config.discord_token.clone(), &discord).await?;
     let dispatcher = EventDispatcher::new(Arc::new(redis_transport));
+
+    let discord_interactions = discord.clone();
+    let redis_url_interactions = config.redis_url.clone();
+    let lavende_interactions = lavende_manager.clone();
+    tokio::spawn(async move {
+        if let Ok(client) = redis::Client::open(redis_url_interactions)
+            && let Ok(mut pubsub) = client.get_async_pubsub().await
+        {
+            let _ = pubsub.subscribe("harmony_events_discord").await;
+            use futures::StreamExt;
+            let mut stream = pubsub.into_on_message();
+            while let Some(msg) = stream.next().await {
+                let payload: String = match msg.get_payload() {
+                    Ok(p) => p,
+                    Err(_) => continue,
+                };
+                if let Ok(harmony_common::event::HarmonyEvent::Discord(arc_event)) =
+                    serde_json::from_str(&payload)
+                    && let harmony_common::event::SerializableEvent::InteractionCreate(interaction) =
+                        arc_event.as_ref()
+                    && let Some(
+                        twilight_model::application::interaction::InteractionData::MessageComponent(
+                            comp,
+                        ),
+                    ) = &interaction.0.data
+                    && (comp.custom_id == "music_stop" || comp.custom_id == "music_skip")
+                    && let Some(guild_id) = interaction.0.guild_id
+                {
+                    if comp.custom_id == "music_stop" {
+                        if let Some(player) = lavende_interactions.get_player(&guild_id.to_string())
+                        {
+                            let _ = player.stop().await;
+                        }
+                    } else if comp.custom_id == "music_skip"
+                        && let Some(player) = lavende_interactions.get_player(&guild_id.to_string())
+                    {
+                        let _ = player.skip().await;
+                    }
+
+                    let interaction_client =
+                        discord_interactions.interaction(interaction.0.application_id);
+                    let response = twilight_model::http::interaction::InteractionResponse {
+                                                kind: twilight_model::http::interaction::InteractionResponseType::DeferredUpdateMessage,
+                                                data: None,
+                                            };
+                    let _ = interaction_client
+                        .create_response(interaction.0.id, &interaction.0.token, &response)
+                        .await;
+                }
+            }
+        }
+    });
+
     let event_loop = EventLoop::new(
         shard_manager,
         dispatcher,

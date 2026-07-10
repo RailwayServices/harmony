@@ -112,11 +112,10 @@ impl AudioListener {
                         };
 
                         if should_play {
-                            if let Some(ch) = text_channel_id {
-                                if let Ok(parsed_ch) = ch.parse::<u64>() {
-                                    player
-                                        .set_data("text_channel_id", serde_json::json!(parsed_ch));
-                                }
+                            if let Some(ch) = text_channel_id
+                                && let Ok(parsed_ch) = ch.parse::<u64>()
+                            {
+                                player.set_data("text_channel_id", serde_json::json!(parsed_ch));
                             }
                             let _ = player.play().await;
                         }

@@ -106,10 +106,10 @@ impl MusicModule {
                     }
                 };
 
-                if let Some(map) = MUSIC_RESPONSES.get() {
-                    if let Some((_, sender)) = map.remove(req_id) {
-                        let _ = sender.send(response);
-                    }
+                if let Some(map) = MUSIC_RESPONSES.get()
+                    && let Some((_, sender)) = map.remove(req_id)
+                {
+                    let _ = sender.send(response);
                 }
             }
         });

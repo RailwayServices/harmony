@@ -1,5 +1,5 @@
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker};
 
 pub type GuildId = Id<GuildMarker>;
 pub type UserId = Id<UserMarker>;

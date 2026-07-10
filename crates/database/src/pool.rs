@@ -1,6 +1,6 @@
 use harmony_common::error::HarmonyError;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 
 #[derive(Clone)]
