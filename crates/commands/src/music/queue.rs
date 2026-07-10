@@ -1,7 +1,9 @@
 use crate::core::interaction::InteractionContext;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
-use harmony_modules::LAVENDE_MANAGER;
+use harmony_common::music_ipc::{MusicCommand, MusicResponse};
+use harmony_modules::MUSIC_RESPONSES;
+use tokio::time::{timeout, Duration};
 use twilight_util::builder::embed::EmbedBuilder;
 
 fn format_duration(ms: u64) -> String {
@@ -26,18 +28,47 @@ pub async fn handle_queue(
         .guild_id
         .ok_or_else(|| HarmonyError::Internal("Command must be run in a guild".to_string()))?;
 
-    let manager = LAVENDE_MANAGER
-        .get()
-        .ok_or_else(|| HarmonyError::Internal("Lavende Manager not initialized".to_string()))?;
+    interaction_ctx.defer(module_ctx).await?;
 
-    if let Some(player) = manager.get_player(&guild_id.to_string()) {
-        tracing::info!("[QUEUE] Displaying queue in Guild {}", guild_id);
-        let queue = player.queue.read().await;
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let (tx, rx) = tokio::sync::oneshot::channel();
 
+    if let Some(map) = MUSIC_RESPONSES.get() {
+        map.insert(req_id.clone(), tx);
+    } else {
+        return Err(HarmonyError::Internal("Music responses map not initialized".to_string()));
+    }
+
+    let cmd = MusicCommand::Queue { req_id: req_id.clone(), guild_id: guild_id.to_string() };
+
+    let payload = serde_json::to_string(&cmd).unwrap_or_default();
+
+    {
+        use redis::AsyncCommands;
+        let mut redis_conn = module_ctx.cache.clone();
+        let _: Result<(), _> = redis_conn.publish("harmony:music:requests", payload).await;
+    }
+
+    let response = match timeout(Duration::from_secs(5), rx).await {
+        Ok(Ok(res)) => res,
+        _ => {
+            if let Some(map) = MUSIC_RESPONSES.get() {
+                map.remove(&req_id);
+            }
+            let embed = EmbedBuilder::new()
+                .description("❌ Timeout waiting for queue data.")
+                .color(0xFF0000)
+                .build();
+            let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+            return Ok(());
+        }
+    };
+
+    if let MusicResponse::QueueResult { tracks, current, .. } = response {
         let mut description = String::new();
         let mut total_duration = 0;
 
-        if let Some(current) = &queue.current {
+        if let Some(current) = &current {
             description.push_str(&format!(
                 "**🎵 Now Playing:**\n[{}]({}) | `{}`\n\n",
                 current.info.title,
@@ -49,11 +80,11 @@ pub async fn handle_queue(
             description.push_str("**🔇 Not playing anything.**\n\n");
         }
 
-        let size = queue.size();
+        let size = tracks.len();
         if size > 0 {
             description.push_str(&format!("**Up Next ({} tracks):**\n", size));
 
-            for (i, track) in queue.tracks.iter().take(10).enumerate() {
+            for (i, track) in tracks.iter().take(10).enumerate() {
                 description.push_str(&format!(
                     "`{}.` [{}]({}) | `{}`\n",
                     i + 1,
@@ -68,11 +99,18 @@ pub async fn handle_queue(
                 description.push_str(&format!("\n*...and {} more tracks*", size - 10));
             }
 
-            for track in queue.tracks.iter().skip(10) {
+            for track in tracks.iter().skip(10) {
                 total_duration += track.info.length;
             }
-        } else if queue.current.is_some() {
+        } else if current.is_some() {
             description.push_str("📭 The queue is empty.");
+        } else {
+            let embed = EmbedBuilder::new()
+                .description("❌ No active player in this server.")
+                .color(0xFF0000)
+                .build();
+            let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+            return Ok(());
         }
 
         let embed = EmbedBuilder::new()
@@ -84,13 +122,13 @@ pub async fn handle_queue(
             )))
             .build();
 
-        let _ = interaction_ctx.reply_embed(embed, module_ctx).await;
+        let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
     } else {
         let embed = EmbedBuilder::new()
-            .description("❌ No active player in this server.")
+            .description("❌ Invalid response from audio node.")
             .color(0xFF0000)
             .build();
-        let _ = interaction_ctx.reply_embed(embed, module_ctx).await;
+        let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
     }
 
     Ok(())

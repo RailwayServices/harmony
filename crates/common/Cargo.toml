@@ -16,3 +16,4 @@ sqlx = { version = "0.8", features = ["postgres"] }
 redis = { version = "0.27", features = ["aio", "tokio-comp"] }
 tokio = { version = "1.52", features = ["sync"] }
 dotenvy = "0.15"
+lavende = "1.0.3"

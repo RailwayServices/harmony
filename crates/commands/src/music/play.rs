@@ -1,8 +1,10 @@
 use crate::core::interaction::InteractionContext;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
-use harmony_modules::{LAVENDE_MANAGER, VOICE_STATES};
+use harmony_common::music_ipc::{MusicCommand, MusicResponse};
+use harmony_modules::MUSIC_RESPONSES;
 use lavende::LoadResult;
+use tokio::time::{timeout, Duration};
 use twilight_util::builder::embed::EmbedBuilder;
 
 pub async fn handle(
@@ -28,12 +30,13 @@ pub async fn handle(
     }
 
     let channel_id = {
-        let states = VOICE_STATES.get().ok_or_else(|| {
-            HarmonyError::Internal("Voice states cache not initialized".to_string())
-        })?;
+        let mut redis_conn = module_ctx.cache.clone();
+        use redis::AsyncCommands;
+        let cid: Option<String> =
+            redis_conn.hget("harmony:voice_states", user_id.to_string()).await.unwrap_or(None);
 
-        match states.get(&user_id.get()) {
-            Some(id) => *id,
+        match cid {
+            Some(id) => id,
             None => {
                 let embed = EmbedBuilder::new()
                     .description("❌ You must be in a voice channel!")
@@ -49,62 +52,65 @@ pub async fn handle(
     let search_query =
         if query.starts_with("http") { query.clone() } else { format!("ytsearch:{}", query) };
 
-    let manager = LAVENDE_MANAGER
-        .get()
-        .ok_or_else(|| HarmonyError::Internal("Lavende Manager not initialized".to_string()))?;
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let (tx, rx) = tokio::sync::oneshot::channel();
 
-    let player = manager.get_or_create_player(&guild_id.to_string());
+    if let Some(map) = MUSIC_RESPONSES.get() {
+        map.insert(req_id.clone(), tx);
+    } else {
+        return Err(HarmonyError::Internal("Music responses map not initialized".to_string()));
+    }
 
-    let ((), search_result) = tokio::join!(
-        player.connect(Some(channel_id.to_string()), true, false),
-        player.search(&search_query)
-    );
+    let text_channel_id =
+        interaction_ctx.interaction.channel.as_ref().map(|c| c.id.get().to_string());
 
-    let text_channel_id = interaction_ctx.interaction.channel.as_ref().map(|c| c.id);
+    let cmd = MusicCommand::Play {
+        req_id: req_id.clone(),
+        guild_id: guild_id.to_string(),
+        channel_id: channel_id.to_string(),
+        text_channel_id,
+        query: search_query,
+    };
 
-    match search_result {
-        Ok(result) => match result {
+    let payload = serde_json::to_string(&cmd).unwrap_or_default();
+
+    {
+        use redis::AsyncCommands;
+        let mut redis_conn = module_ctx.cache.clone();
+        let _: Result<(), _> = redis_conn.publish("harmony:music:requests", payload).await;
+    }
+
+    let response = match timeout(Duration::from_secs(15), rx).await {
+        Ok(Ok(res)) => res,
+        _ => {
+            if let Some(map) = MUSIC_RESPONSES.get() {
+                map.remove(&req_id);
+            }
+            let embed = EmbedBuilder::new()
+                .description("❌ Timeout waiting for audio node.")
+                .color(0xFF0000)
+                .build();
+            let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+            return Ok(());
+        }
+    };
+
+    match response {
+        MusicResponse::PlayResult { result, .. } => match result {
             LoadResult::Empty {} => {
                 let embed =
                     EmbedBuilder::new().description("❌ No results found.").color(0xFF0000).build();
                 let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
             }
             LoadResult::Track(track) => {
-                tracing::info!("[PLAY] Track: {} by {}", track.info.title, track.info.author);
-                let should_play = {
-                    let mut q = player.queue.write().await;
-                    let was_empty = q.current.is_none() && q.tracks.is_empty();
-                    q.add(track.clone());
-                    was_empty
-                };
                 let embed = EmbedBuilder::new()
                     .description(format!("✅ **{}** by {}", track.info.title, track.info.author))
                     .color(module_ctx.embed_color)
                     .build();
                 let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
-                if should_play {
-                    if let Some(ch) = text_channel_id {
-                        player.set_data("text_channel_id", serde_json::json!(ch.get()));
-                    }
-                    let _ = player.play().await;
-                }
-                let mut redis_conn = module_ctx.cache.clone();
-                harmony_modules::state_sync::sync_player_state(
-                    &guild_id.to_string(),
-                    &player,
-                    &mut redis_conn,
-                )
-                .await;
             }
             LoadResult::Search(tracks) => {
                 if let Some(track) = tracks.first() {
-                    tracing::info!("[PLAY] Track: {} by {}", track.info.title, track.info.author);
-                    let should_play = {
-                        let mut q = player.queue.write().await;
-                        let was_empty = q.current.is_none() && q.tracks.is_empty();
-                        q.add(track.clone());
-                        was_empty
-                    };
                     let embed = EmbedBuilder::new()
                         .description(format!(
                             "✅ **{}** by {}",
@@ -113,51 +119,17 @@ pub async fn handle(
                         .color(module_ctx.embed_color)
                         .build();
                     let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
-                    if should_play {
-                        if let Some(ch) = text_channel_id {
-                            player.set_data("text_channel_id", serde_json::json!(ch.get()));
-                        }
-                        let _ = player.play().await;
-                    }
-                    let mut redis_conn = module_ctx.cache.clone();
-                    harmony_modules::state_sync::sync_player_state(
-                        &guild_id.to_string(),
-                        &player,
-                        &mut redis_conn,
-                    )
-                    .await;
                 }
             }
             LoadResult::Playlist(playlist) => {
                 let count = playlist.tracks.len();
-                tracing::info!("[PLAY] Playlist: {} tracks", count);
-                let should_play = {
-                    let mut q = player.queue.write().await;
-                    let was_empty = q.current.is_none() && q.tracks.is_empty();
-                    q.add_multiple(playlist.tracks);
-                    was_empty
-                };
                 let embed = EmbedBuilder::new()
                     .description(format!("📃 Added **{}** tracks from playlist", count))
                     .color(module_ctx.embed_color)
                     .build();
                 let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
-                if should_play {
-                    if let Some(ch) = text_channel_id {
-                        player.set_data("text_channel_id", serde_json::json!(ch.get()));
-                    }
-                    let _ = player.play().await;
-                }
-                let mut redis_conn = module_ctx.cache.clone();
-                harmony_modules::state_sync::sync_player_state(
-                    &guild_id.to_string(),
-                    &player,
-                    &mut redis_conn,
-                )
-                .await;
             }
             LoadResult::Error(e) => {
-                tracing::error!("[PLAY] Load error: {:?}", e.message);
                 let embed = EmbedBuilder::new()
                     .description(format!("❌ Error loading track: {:?}", e.message))
                     .color(0xFF0000)
@@ -165,10 +137,16 @@ pub async fn handle(
                 let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
             }
         },
-        Err(e) => {
-            tracing::error!("[PLAY] Search failed: {}", e);
+        MusicResponse::Error { message, .. } => {
             let embed = EmbedBuilder::new()
-                .description(format!("❌ Search failed: {}", e))
+                .description(format!("❌ Search failed: {}", message))
+                .color(0xFF0000)
+                .build();
+            let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+        }
+        _ => {
+            let embed = EmbedBuilder::new()
+                .description("❌ Invalid response from audio node.")
                 .color(0xFF0000)
                 .build();
             let _ = interaction_ctx.edit_embed(embed, module_ctx).await;

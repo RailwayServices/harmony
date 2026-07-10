@@ -1272,7 +1272,8 @@ dependencies = [
  "harmony-common",
  "harmony-database",
  "harmony-modules",
- "lavende 0.1.16",
+ "lavende",
+ "redis",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
@@ -1280,6 +1281,7 @@ dependencies = [
  "twilight-http",
  "twilight-model",
  "twilight-util",
+ "uuid",
 ]
 
 [[package]]
@@ -1287,6 +1289,7 @@ name = "harmony-common"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
+ "lavende",
  "redis",
  "serde",
  "serde_json",
@@ -1317,9 +1320,13 @@ dependencies = [
 name = "harmony-gateway"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "futures-util",
  "harmony-common",
  "harmony-messaging",
+ "lavende",
+ "redis",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -1336,7 +1343,9 @@ dependencies = [
  "harmony-common",
  "harmony-gateway",
  "harmony-messaging",
+ "lavende",
  "rustls 0.23.41",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -1364,9 +1373,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "dashmap 5.5.3",
+ "futures",
  "harmony-common",
  "harmony-database",
- "lavende 1.0.0",
  "redis",
  "serde",
  "serde_json",
@@ -1952,26 +1961,9 @@ dependencies = [
 
 [[package]]
 name = "lavende"
-version = "0.1.16"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d44ae791eb908ce10b47cb5a9f2ccebb10e2816ecbe6def92ab4ce4c7cec46b6"
-dependencies = [
- "async-trait",
- "dashmap 6.2.1",
- "futures",
- "lavende-core",
- "rand 0.10.2",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "lavende"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe212d1d93702d32e7d03b6e10d0718429d9f4b26c3290f50c2db0ad0676e9f7"
+checksum = "67d27b9ffa5655bc77c74d90f68ec3bf45d4607c47d0f96d243b1b2531d4993f"
 dependencies = [
  "async-trait",
  "dashmap 6.2.1",
@@ -1986,9 +1978,9 @@ dependencies = [
 
 [[package]]
 name = "lavende-core"
-version = "0.1.10"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dd23cd58a867fb6a0c317704601527ed94dc56d655e7882cba0ebe0062b5870"
+checksum = "74320a235d28852649b20d71d44e536f76fa85fe4c066a9f31afc93e7c961a14"
 dependencies = [
  "aes",
  "async-trait",
@@ -4759,9 +4751,9 @@ checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
 
 [[package]]
 name = "uuid"
-version = "1.23.3"
+version = "1.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "144d6b123cef80b301b8f72a9e2ca4370ddec21950d0a103dd22c437006d2db7"
+checksum = "bf80a72845275afea99e7f2b434723d3bc7e38470fcd1c7ed39a599c73319a53"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
