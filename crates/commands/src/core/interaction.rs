@@ -73,6 +73,25 @@ impl InteractionContext {
         None
     }
 
+    pub async fn defer_update(
+        &self,
+        module_ctx: &harmony_common::module::ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        let interaction_client = module_ctx.discord.interaction(self.interaction.application_id);
+
+        let response = twilight_model::http::interaction::InteractionResponse {
+            kind: twilight_model::http::interaction::InteractionResponseType::DeferredUpdateMessage,
+            data: None,
+        };
+
+        interaction_client
+            .create_response(self.interaction.id, &self.interaction.token, &response)
+            .await
+            .map_err(|e| HarmonyError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
     pub async fn defer(
         &self,
         module_ctx: &harmony_common::module::ModuleContext,

@@ -1,6 +1,21 @@
 use lavende::{LoadResult, Track};
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ButtonTemplate {
+    pub custom_id: String,
+    pub label: String,
+    pub emoji: String,
+    pub style: u8,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NowPlayingUiTemplate {
+    pub color: u32,
+    pub description: String,
+    pub buttons: Vec<ButtonTemplate>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MusicCommand {
     Play {

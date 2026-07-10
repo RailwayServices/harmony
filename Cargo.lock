@@ -1344,6 +1344,7 @@ dependencies = [
  "harmony-gateway",
  "harmony-messaging",
  "lavende",
+ "redis",
  "rustls 0.23.41",
  "serde_json",
  "tokio",
@@ -1352,6 +1353,7 @@ dependencies = [
  "tracing-subscriber",
  "twilight-http",
  "twilight-model",
+ "twilight-util",
 ]
 
 [[package]]
@@ -1376,6 +1378,7 @@ dependencies = [
  "futures",
  "harmony-common",
  "harmony-database",
+ "lavende",
  "redis",
  "serde",
  "serde_json",
