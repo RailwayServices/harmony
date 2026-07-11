@@ -1,18 +1,19 @@
 use harmony_common::error::HarmonyError;
-use redis::AsyncCommands;
 use redis::aio::MultiplexedConnection;
 
-pub struct DistributedLock {}
+pub struct DistributedLock;
 
 impl DistributedLock {
     pub async fn acquire(
         conn: &mut MultiplexedConnection,
         key: &str,
         ttl_millis: u64,
-    ) -> Result<bool, HarmonyError> {
+    ) -> Result<Option<String>, HarmonyError> {
+        let token = uuid::Uuid::new_v4().to_string();
+
         let result: Option<String> = redis::cmd("SET")
             .arg(key)
-            .arg("1")
+            .arg(&token)
             .arg("NX")
             .arg("PX")
             .arg(ttl_millis)
@@ -20,11 +21,27 @@ impl DistributedLock {
             .await
             .map_err(HarmonyError::Cache)?;
 
-        Ok(result.is_some())
+        Ok(result.map(|_| token))
     }
 
-    pub async fn release(conn: &mut MultiplexedConnection, key: &str) -> Result<(), HarmonyError> {
-        let _: () = conn.del(key).await.map_err(HarmonyError::Cache)?;
-        Ok(())
+    pub async fn release(
+        conn: &mut MultiplexedConnection,
+        key: &str,
+        token: &str,
+    ) -> Result<bool, HarmonyError> {
+        let script = redis::Script::new(
+            r#"
+            if redis.call("GET", KEYS[1]) == ARGV[1] then
+                return redis.call("DEL", KEYS[1])
+            else
+                return 0
+            end
+            "#,
+        );
+
+        let result: i64 =
+            script.key(key).arg(token).invoke_async(conn).await.map_err(HarmonyError::Cache)?;
+
+        Ok(result == 1)
     }
 }

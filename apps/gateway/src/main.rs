@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use harmony_common::config::AppConfig;
 use harmony_common::error::HarmonyError;
 use harmony_gateway::dispatcher::EventDispatcher;
@@ -10,6 +11,12 @@ use std::sync::Arc;
 use tokio::signal;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
+
+enum SpeakerState {
+    Quiet(std::time::Instant),
+    Speaking(std::time::Instant),
+}
+
 use twilight_http::Client as DiscordClient;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -78,7 +85,7 @@ async fn main() -> Result<(), HarmonyError> {
             let _ = event_tx_clone.try_send(event);
         }
     };
-    let lavende_manager = Arc::new(LavendeManager::new(client_id, send_to_shard_fn));
+    let lavende_manager = Arc::new(LavendeManager::new(client_id.clone(), send_to_shard_fn));
 
     let audio_listener = harmony_gateway::audio_listener::AudioListener::new(
         lavende_manager.clone(),
@@ -91,6 +98,98 @@ async fn main() -> Result<(), HarmonyError> {
     let mut event_rx_lavende = lavende_manager.subscribe_events();
     let redis_url_clone = config.redis_url.clone();
     let discord_clone = discord.clone();
+    let lavende_manager_event_loop = lavende_manager.clone();
+    let client_id_loop = client_id.clone();
+
+    let active_speakers: Arc<DashMap<String, DashMap<String, SpeakerState>>> =
+        Arc::new(DashMap::new());
+
+    let lav_mgr_clone = lavende_manager.clone();
+    let speakers_clone = active_speakers.clone();
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+        loop {
+            interval.tick().await;
+
+            let mut to_restore_volume = Vec::new();
+            let mut to_remove = Vec::new();
+
+            for guild_entry in speakers_clone.iter() {
+                let guild_id = guild_entry.key().clone();
+                let users = guild_entry.value();
+                let mut is_anyone_speaking = false;
+                let mut most_recent_quiet = None;
+
+                for mut user_entry in users.iter_mut() {
+                    let mut stopped = false;
+                    match *user_entry.value() {
+                        SpeakerState::Speaking(last_data) => {
+                            if last_data.elapsed().as_millis() > 400 {
+                                stopped = true;
+                            } else {
+                                is_anyone_speaking = true;
+                            }
+                        }
+                        SpeakerState::Quiet(time) => {
+                            if most_recent_quiet.is_none() || Some(time) > most_recent_quiet {
+                                most_recent_quiet = Some(time);
+                            }
+                        }
+                    }
+                    if stopped {
+                        *user_entry.value_mut() = SpeakerState::Quiet(std::time::Instant::now());
+                        to_restore_volume.push((guild_id.clone(), user_entry.key().clone()));
+                        most_recent_quiet = Some(std::time::Instant::now());
+                    }
+                }
+
+                if !is_anyone_speaking {
+                    if let Some(time) = most_recent_quiet {
+                        if time.elapsed().as_secs_f32() >= 5.0 {
+                            to_remove.push(guild_id.clone());
+                        }
+                    } else {
+                        to_remove.push(guild_id.clone());
+                    }
+                }
+            }
+
+            for (g_id, u_id) in to_restore_volume {
+                tracing::info!("[AutoDuck] User {} stopped speaking in guild {}", u_id, g_id);
+
+                let lav_mgr = lav_mgr_clone.clone();
+                let speakers = speakers_clone.clone();
+
+                tokio::spawn(async move {
+                    let mut currently_speaking = false;
+                    if let Some(guild_users) = speakers.get(&g_id) {
+                        for user_state in guild_users.iter() {
+                            if let SpeakerState::Speaking(_) = *user_state.value() {
+                                currently_speaking = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if !currently_speaking {
+                        tracing::info!(
+                            "[AutoDuck] Silence confirmed in guild {}. Restoring volume to 100%.",
+                            g_id
+                        );
+                        if let Some(player) = lav_mgr.get_player(&g_id) {
+                            let _ = player.set_volume(100).await;
+                        }
+                    }
+                });
+            }
+
+            for guild_id in to_remove {
+                speakers_clone.remove(&guild_id);
+            }
+        }
+    });
+
     tokio::spawn(async move {
         if let Ok(client) = redis::Client::open(redis_url_clone)
             && let Ok(mut con) = client.get_multiplexed_async_connection().await
@@ -188,6 +287,62 @@ async fn main() -> Result<(), HarmonyError> {
                                         )
                                         .await;
                                 }
+                            }
+                        }
+                    }
+                    lavende::LavendeEvent::VoiceData { guild_id, user_id, pcm_data } => {
+                        // Do not process bot's own voice
+                        if user_id == client_id_loop {
+                            continue;
+                        }
+
+                        let mut sum_sq = 0.0;
+                        for &sample in &pcm_data {
+                            let s = sample as f32 / 32768.0;
+                            sum_sq += s * s;
+                        }
+                        let rms = (sum_sq / pcm_data.len() as f32).sqrt();
+
+                        let is_loud = rms > 0.025;
+
+                        let is_new = {
+                            let guild_map = active_speakers.entry(guild_id.clone()).or_default();
+                            let mut user_state = guild_map
+                                .entry(user_id.clone())
+                                .or_insert(SpeakerState::Quiet(std::time::Instant::now()));
+
+                            let mut new = false;
+                            match *user_state {
+                                SpeakerState::Quiet(_) => {
+                                    if is_loud {
+                                        *user_state =
+                                            SpeakerState::Speaking(std::time::Instant::now());
+                                        new = true;
+                                    }
+                                }
+                                SpeakerState::Speaking(_) => {
+                                    if is_loud {
+                                        *user_state =
+                                            SpeakerState::Speaking(std::time::Instant::now());
+                                    }
+                                }
+                            }
+                            new
+                        };
+
+                        if is_new {
+                            tracing::info!(
+                                "[AutoDuck] User {} started speaking in guild {} (RMS: {:.4})",
+                                user_id,
+                                guild_id,
+                                rms
+                            );
+                            if let Some(player) = lavende_manager_event_loop.get_player(&guild_id) {
+                                tracing::info!(
+                                    "[AutoDuck] Ducking volume to 15% for guild {}",
+                                    guild_id
+                                );
+                                let _ = player.set_volume(15).await;
                             }
                         }
                     }

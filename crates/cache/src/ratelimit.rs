@@ -1,8 +1,7 @@
 use harmony_common::error::HarmonyError;
-use redis::AsyncCommands;
 use redis::aio::MultiplexedConnection;
 
-pub struct RateLimiter {}
+pub struct RateLimiter;
 
 impl RateLimiter {
     pub async fn check_and_increment(
@@ -10,12 +9,22 @@ impl RateLimiter {
         key: &str,
         window_seconds: u64,
     ) -> Result<i64, HarmonyError> {
-        let count: i64 = conn.incr(key, 1).await.map_err(HarmonyError::Cache)?;
+        let script = redis::Script::new(
+            r#"
+            local count = redis.call('INCR', KEYS[1])
+            if count == 1 then
+                redis.call('EXPIRE', KEYS[1], ARGV[1])
+            end
+            return count
+            "#,
+        );
 
-        if count == 1 {
-            let _: () =
-                conn.expire(key, window_seconds as i64).await.map_err(HarmonyError::Cache)?;
-        }
+        let count: i64 = script
+            .key(key)
+            .arg(window_seconds as i64)
+            .invoke_async(conn)
+            .await
+            .map_err(HarmonyError::Cache)?;
 
         Ok(count)
     }

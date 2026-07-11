@@ -62,15 +62,24 @@ impl Subscriber for RedisTransport {
         let channel_name = self.subscribe_channel.clone();
 
         tokio::spawn(async move {
+            let mut retry_count = 0u32;
             loop {
                 info!("Connecting to Redis Pub/Sub channel: {}", channel_name);
                 match client.get_async_pubsub().await {
                     Ok(mut pubsub) => {
                         if let Err(e) = pubsub.subscribe(&channel_name).await {
                             error!("Failed to subscribe to Redis channel: {}", e);
-                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+                            let delay = std::cmp::min(2u64.pow(retry_count), 30);
+                            retry_count = retry_count.saturating_add(1);
+
+                            error!("Retrying in {} seconds (attempt {})...", delay, retry_count);
+                            tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
                             continue;
                         }
+
+                        retry_count = 0;
+                        info!("Successfully connected to Redis Pub/Sub");
 
                         let mut stream = pubsub.on_message();
                         while let Some(msg) = stream.next().await {
@@ -94,8 +103,15 @@ impl Subscriber for RedisTransport {
                         error!("Redis PubSub connection error: {}", e);
                     }
                 }
-                error!("Redis Pub/Sub stream ended. Reconnecting in 5 seconds...");
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+                let delay = std::cmp::min(2u64.pow(retry_count), 30);
+                retry_count = retry_count.saturating_add(1);
+
+                error!(
+                    "Redis Pub/Sub stream ended. Reconnecting in {} seconds (attempt {})...",
+                    delay, retry_count
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
             }
         });
 

@@ -29,6 +29,29 @@ pub async fn handle(
         return interaction_ctx.reply_embed(embed, module_ctx).await;
     }
 
+    if query.len() > 500 {
+        let embed = EmbedBuilder::new()
+            .description("❌ Query too long! Maximum 500 characters.")
+            .color(0xFF0000)
+            .build();
+        return interaction_ctx.reply_embed(embed, module_ctx).await;
+    }
+
+    if query.starts_with("http") {
+        if !query.starts_with("https://") && !query.starts_with("http://") {
+            let embed =
+                EmbedBuilder::new().description("❌ Invalid URL format!").color(0xFF0000).build();
+            return interaction_ctx.reply_embed(embed, module_ctx).await;
+        }
+        if query.contains("localhost") || query.contains("127.0.0.1") || query.contains("0.0.0.0") {
+            let embed = EmbedBuilder::new()
+                .description("❌ Cannot play from local URLs!")
+                .color(0xFF0000)
+                .build();
+            return interaction_ctx.reply_embed(embed, module_ctx).await;
+        }
+    }
+
     let channel_id = {
         let mut redis_conn = module_ctx.cache.clone();
         use redis::AsyncCommands;
