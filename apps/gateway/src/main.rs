@@ -14,7 +14,11 @@ use tracing_subscriber::EnvFilter;
 
 enum SpeakerState {
     Quiet(std::time::Instant),
-    Speaking(std::time::Instant),
+    Speaking {
+        speech_start: std::time::Instant,
+        last_packet: std::time::Instant,
+        auto_paused: bool,
+    },
 }
 
 use twilight_http::Client as DiscordClient;
@@ -124,8 +128,8 @@ async fn main() -> Result<(), HarmonyError> {
                 for mut user_entry in users.iter_mut() {
                     let mut stopped = false;
                     match *user_entry.value() {
-                        SpeakerState::Speaking(last_data) => {
-                            if last_data.elapsed().as_millis() > 400 {
+                        SpeakerState::Speaking { last_packet, .. } => {
+                            if last_packet.elapsed().as_millis() > 400 {
                                 stopped = true;
                             } else {
                                 is_anyone_speaking = true;
@@ -165,7 +169,7 @@ async fn main() -> Result<(), HarmonyError> {
                     let mut currently_speaking = false;
                     if let Some(guild_users) = speakers.get(&g_id) {
                         for user_state in guild_users.iter() {
-                            if let SpeakerState::Speaking(_) = *user_state.value() {
+                            if let SpeakerState::Speaking { .. } = *user_state.value() {
                                 currently_speaking = true;
                                 break;
                             }
@@ -303,7 +307,8 @@ async fn main() -> Result<(), HarmonyError> {
                         }
                         let rms = (sum_sq / pcm_data.len() as f32).sqrt();
 
-                        let is_loud = rms > 0.025;
+                        // Strict threshold to ignore background noise
+                        let is_loud = rms > 0.035;
 
                         let is_new = {
                             let guild_map = active_speakers.entry(guild_id.clone()).or_default();
@@ -315,15 +320,36 @@ async fn main() -> Result<(), HarmonyError> {
                             match *user_state {
                                 SpeakerState::Quiet(_) => {
                                     if is_loud {
-                                        *user_state =
-                                            SpeakerState::Speaking(std::time::Instant::now());
+                                        let now = std::time::Instant::now();
+                                        *user_state = SpeakerState::Speaking {
+                                            speech_start: now,
+                                            last_packet: now,
+                                            auto_paused: false,
+                                        };
                                         new = true;
                                     }
                                 }
-                                SpeakerState::Speaking(_) => {
+                                SpeakerState::Speaking {
+                                    speech_start,
+                                    ref mut last_packet,
+                                    ref mut auto_paused,
+                                } => {
                                     if is_loud {
-                                        *user_state =
-                                            SpeakerState::Speaking(std::time::Instant::now());
+                                        *last_packet = std::time::Instant::now();
+
+                                        if !*auto_paused && speech_start.elapsed().as_secs() >= 10 {
+                                            tracing::info!(
+                                                "[AutoPause] User {} spoke for >10s in guild {}. Pausing music.",
+                                                user_id,
+                                                guild_id
+                                            );
+                                            *auto_paused = true;
+                                            if let Some(player) = lavende_manager_event_loop.get_player(&guild_id) {
+                                                tokio::spawn(async move {
+                                                    let _ = player.pause(true).await;
+                                                });
+                                            }
+                                        }
                                     }
                                 }
                             }
