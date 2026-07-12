@@ -138,7 +138,7 @@ async fn main() -> Result<(), HarmonyError> {
                     let mut was_ducking_val = false;
                     match *user_entry.value() {
                         SpeakerState::Speaking { last_packet, is_ducking, .. } => {
-                            if last_packet.elapsed().as_millis() > 400 {
+                            if last_packet.elapsed().as_millis() > 1500 {
                                 stopped = true;
                                 was_ducking_val = is_ducking;
                             } else {
@@ -168,7 +168,7 @@ async fn main() -> Result<(), HarmonyError> {
                 if !is_anyone_speaking
                     && needs_restore
                     && let Some(time) = most_recent_quiet
-                    && time.elapsed().as_secs_f32() >= 3.5
+                    && time.elapsed().as_secs_f32() >= 2.0
                 {
                     to_restore_volume.push(guild_id.clone());
                     for mut user_entry in users.iter_mut() {
@@ -192,7 +192,7 @@ async fn main() -> Result<(), HarmonyError> {
 
             for g_id in to_restore_volume {
                 tracing::info!(
-                    "[AutoDuck] 3.5 seconds of silence confirmed in guild {}. Restoring volume to 100%.",
+                    "[AutoDuck] Volume restore triggered in guild {}. Restoring volume to 100%.",
                     g_id
                 );
                 if let Some(player) = lav_mgr_clone.get_player(&g_id) {
@@ -226,7 +226,7 @@ async fn main() -> Result<(), HarmonyError> {
 
                 if !is_anyone_speaking
                     && let Some(time) = most_recent_quiet
-                    && time.elapsed().as_secs() >= 5
+                    && time.elapsed().as_secs() >= 4
                 {
                     to_resume.push(g_id);
                 }
@@ -235,7 +235,7 @@ async fn main() -> Result<(), HarmonyError> {
             for g_id in to_resume {
                 paused_guilds_clone.remove(&g_id);
                 tracing::info!(
-                    "[AutoResume] 5 seconds of total silence in guild {}. Resuming music.",
+                    "[AutoResume] 4 seconds of total silence in guild {}. Resuming music.",
                     g_id
                 );
                 if let Some(player) = lav_mgr_clone.get_player(&g_id) {
