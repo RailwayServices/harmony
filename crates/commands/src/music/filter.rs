@@ -50,7 +50,6 @@ pub async fn handle_filter(
     Ok(())
 }
 
-
 pub async fn handle_prefix_filter(
     ctx: &PrefixContext,
     module_ctx: &ModuleContext,
@@ -58,13 +57,35 @@ pub async fn handle_prefix_filter(
     let filter = ctx.args.join(" ");
 
     let filter_type = filter.to_lowercase();
-    let valid_filters = ["nightcore", "bassboost", "vaporwave", "8d", "karaoke", "tremolo", "vibrato", "pop", "soft", "treblebass", "echo", "chorus", "flanger", "gate", "haas", "phaser", "compressor", "expander", "lowpass", "highpass", "none", "clear", "reset", ""];
-    
+    let valid_filters = [
+        "nightcore",
+        "bassboost",
+        "vaporwave",
+        "8d",
+        "karaoke",
+        "tremolo",
+        "vibrato",
+        "pop",
+        "soft",
+        "treblebass",
+        "echo",
+        "chorus",
+        "flanger",
+        "gate",
+        "haas",
+        "phaser",
+        "compressor",
+        "expander",
+        "lowpass",
+        "highpass",
+        "none",
+        "clear",
+        "reset",
+        "",
+    ];
+
     if !valid_filters.contains(&filter_type.as_str()) {
-        let embed = EmbedBuilder::new()
-            .description("❌ Unknown filter!")
-            .color(0xFF0000)
-            .build();
+        let embed = EmbedBuilder::new().description("❌ Unknown filter!").color(0xFF0000).build();
         let _ = ctx.reply_embed(embed, module_ctx).await;
         return Ok(());
     }

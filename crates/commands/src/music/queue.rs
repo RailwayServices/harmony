@@ -135,7 +135,6 @@ pub async fn handle_queue(
     Ok(())
 }
 
-
 pub async fn handle_prefix_queue(
     ctx: &PrefixContext,
     module_ctx: &ModuleContext,
