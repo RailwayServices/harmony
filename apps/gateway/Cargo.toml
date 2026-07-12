@@ -16,8 +16,9 @@ dotenvy = "0.15"
 twilight-model = "0.17"
 twilight-http = { version = "0.17", default-features = false, features = ["simd-json", "rustls-native-roots"] }
 rustls = { version = "0.23", features = ["ring"] }
-lavende = "1.0.3"
+lavende = { git = "https://github.com/waris4ly/lavende", branch = "dev" }
 serde_json = "1.0.150"
 redis = { version = "0.27", features = ["tokio-comp", "aio"] }
+dashmap = "6.0"
 twilight-util = { version = "0.17", features = ["builder"] }
 futures = "0.3"

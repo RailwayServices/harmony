@@ -16,7 +16,7 @@ twilight-model = "0.17"
 twilight-http = "0.17"
 twilight-util = { version = "0.17", features = ["builder"] }
 chrono = { version = "0.4", features = ["serde"] }
-lavende = "1.0.3"
+lavende = { git = "https://github.com/waris4ly/lavende", branch = "dev" }
 uuid = { version = "1.23.4", features = ["v4"] }
 redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 

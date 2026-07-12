@@ -16,4 +16,5 @@ tracing = "0.1"
 redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 serde_json = "1.0.150"
 futures = "0.3.32"
-lavende = "1.0.3"
+lavende = { git = "https://github.com/waris4ly/lavende", branch = "dev" }
+dashmap = "6.0"

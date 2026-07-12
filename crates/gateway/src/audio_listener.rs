@@ -84,8 +84,10 @@ impl AudioListener {
         match command {
             MusicCommand::Play { req_id, guild_id, channel_id, text_channel_id, query } => {
                 let player = manager.get_or_create_player(&guild_id);
+                player.set_receive_voice(true);
+
                 let ((), search_result) = tokio::join!(
-                    player.connect(Some(channel_id), true, false),
+                    player.connect(Some(channel_id), false, false),
                     player.search(&query)
                 );
 
@@ -173,8 +175,26 @@ impl AudioListener {
                     let _: Result<(), _> = publish_conn.publish(channel, res_payload).await;
                 }
             }
-            MusicCommand::Filter { guild_id, filter_type: _ } => {
-                if let Some(_player) = manager.get_player(&guild_id) {}
+            MusicCommand::Filter { guild_id, filter_type } => {
+                if let Some(player) = manager.get_player(&guild_id) {
+                    let filter_json = match filter_type.as_str() {
+                        "bassboost" => {
+                            r#"{"equalizer":[{"band":0,"gain":0.2},{"band":1,"gain":0.15},{"band":2,"gain":0.1}]}"#
+                        }
+                        "nightcore" => r#"{"timescale":{"speed":1.3,"pitch":1.3,"rate":1.0}}"#,
+                        "vaporwave" => r#"{"timescale":{"speed":0.8,"pitch":0.8,"rate":1.0}}"#,
+                        "8d" => r#"{"rotation":{"rotationHz":0.2}}"#,
+                        "tremolo" => r#"{"tremolo":{"frequency":2.0,"depth":0.5}}"#,
+                        "vibrato" => r#"{"vibrato":{"frequency":2.0,"depth":0.5}}"#,
+                        "clear" => r#"{}"#,
+                        unknown => {
+                            error!("Unknown filter type: {}", unknown);
+                            return;
+                        }
+                    };
+
+                    player.set_filters(filter_json.to_string()).await;
+                }
             }
         }
     }
