@@ -226,7 +226,7 @@ async fn main() -> Result<(), HarmonyError> {
 
                 if !is_anyone_speaking
                     && let Some(time) = most_recent_quiet
-                    && time.elapsed().as_secs() >= 4
+                    && time.elapsed().as_secs_f32() >= 3.5
                 {
                     to_resume.push(g_id);
                 }
@@ -235,7 +235,7 @@ async fn main() -> Result<(), HarmonyError> {
             for g_id in to_resume {
                 paused_guilds_clone.remove(&g_id);
                 tracing::info!(
-                    "[AutoResume] 4 seconds of total silence in guild {}. Resuming music.",
+                    "[AutoResume] 3.5 seconds of total silence in guild {}. Resuming music.",
                     g_id
                 );
                 if let Some(player) = lav_mgr_clone.get_player(&g_id) {
