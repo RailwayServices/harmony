@@ -1692,7 +1692,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "lavende"
 version = "1.0.3"
-source = "git+https://github.com/waris4ly/lavende?branch=dev#6a4c9d15f2c8290dac9123819542b945ec388e9a"
+source = "git+https://github.com/waris4ly/lavende?branch=dev#8c29f67ef1955ae70ea3e623aeeece10721cdd27"
 dependencies = [
  "async-trait",
  "base64",
@@ -1987,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "lavende-core"
 version = "0.1.13"
-source = "git+https://github.com/waris4ly/lavende?branch=dev#6a4c9d15f2c8290dac9123819542b945ec388e9a"
+source = "git+https://github.com/waris4ly/lavende?branch=dev#8c29f67ef1955ae70ea3e623aeeece10721cdd27"
 dependencies = [
  "aes",
  "async-trait",
@@ -2851,7 +2851,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.41",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -2889,7 +2889,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -4975,7 +4975,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

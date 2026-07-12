@@ -168,7 +168,7 @@ async fn main() -> Result<(), HarmonyError> {
                 if !is_anyone_speaking
                     && needs_restore
                     && let Some(time) = most_recent_quiet
-                    && time.elapsed().as_secs() >= 4
+                    && time.elapsed().as_secs_f32() >= 3.5
                 {
                     to_restore_volume.push(guild_id.clone());
                     for mut user_entry in users.iter_mut() {
@@ -192,7 +192,7 @@ async fn main() -> Result<(), HarmonyError> {
 
             for g_id in to_restore_volume {
                 tracing::info!(
-                    "[AutoDuck] 4 seconds of silence confirmed in guild {}. Restoring volume to 100%.",
+                    "[AutoDuck] 3.5 seconds of silence confirmed in guild {}. Restoring volume to 100%.",
                     g_id
                 );
                 if let Some(player) = lav_mgr_clone.get_player(&g_id) {
@@ -364,7 +364,7 @@ async fn main() -> Result<(), HarmonyError> {
                         }
                         let rms = (sum_sq / pcm_data.len() as f32).sqrt();
 
-                        let is_loud = rms > 0.035;
+                        let is_loud = rms > 0.07;
 
                         let mut trigger_duck = false;
                         let mut trigger_pause = false;
