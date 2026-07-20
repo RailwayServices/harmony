@@ -6,19 +6,14 @@ edition = "2024"
 [dependencies]
 harmony-common = { path = "../../crates/common" }
 harmony-database = { path = "../../crates/database" }
-harmony-cache = { path = "../../crates/cache" }
 harmony-messaging = { path = "../../crates/messaging" }
-harmony-gateway = { path = "../../crates/gateway" }
 harmony-modules = { path = "../../crates/modules" }
 harmony-commands = { path = "../../crates/commands" }
 tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "signal"] }
 twilight-http = "0.17"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-thiserror = "2"
 redis = "0.27"
 rustls = { version = "0.23", features = ["ring"] }
-serde_json = "1.0.150"
-twilight-model = "0.17"
 dotenvy = "0.15.7"
-tracing-appender = "0.2"
+harmony-cache = { version = "0.1.0", path = "../../crates/cache" }

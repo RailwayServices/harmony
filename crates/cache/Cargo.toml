@@ -6,8 +6,6 @@ edition = "2024"
 [dependencies]
 harmony-common = { path = "../common" }
 redis = { version = "0.27", features = ["tokio-comp"] }
-tokio = { version = "1.52", features = ["sync", "time"] }
-thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }

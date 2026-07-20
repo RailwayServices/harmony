@@ -18,13 +18,14 @@ pub struct RedisTransport {
 }
 
 impl RedisTransport {
-    pub fn new(
+    pub async fn new(
         redis_url: &str,
         publish_channel: &str,
         subscribe_channel: &str,
         capacity: usize,
     ) -> Result<Self, HarmonyError> {
-        let client = redis::Client::open(redis_url).map_err(HarmonyError::Cache)?;
+        let cache_client = harmony_cache::client::CacheClient::connect(redis_url).await?;
+        let client = cache_client.client;
         Ok(Self {
             client,
             pub_conn: OnceCell::new(),

@@ -60,10 +60,8 @@ async fn main() -> Result<(), HarmonyError> {
     info!("[POSTGRES] Migrations complete.");
 
     info!("[REDIS] Connecting to server: {}", sanitize_redis_url(&config.redis_url));
-    let redis_client =
-        redis::Client::open(config.redis_url.clone()).map_err(HarmonyError::Cache)?;
-    let cache =
-        redis_client.get_multiplexed_async_connection().await.map_err(HarmonyError::Cache)?;
+    let cache_client = harmony_cache::client::CacheClient::connect(&config.redis_url).await?;
+    let cache = cache_client.connection;
 
     let discord = Arc::new(DiscordClient::new(config.discord_token.clone()));
 
@@ -85,7 +83,7 @@ async fn main() -> Result<(), HarmonyError> {
         "harmony_events_worker",
         "harmony_events_discord",
         config.event_bus_capacity,
-    )?);
+    ).await?);
 
     let module_ctx = Arc::new(ModuleContext {
         db,

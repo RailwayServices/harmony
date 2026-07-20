@@ -6,15 +6,10 @@ edition = "2024"
 [dependencies]
 harmony-common = { path = "../common" }
 twilight-model = "0.17"
-twilight-http = "0.17"
 tokio = { version = "1.52", features = ["full"] }
-async-trait = "0.1"
 serde_json = "1"
 tracing = "0.1"
 dashmap = "5.5.3"
-twilight-util = { version = "0.17", features = ["builder"] }
-harmony-database = { path = "../database" }
 redis = { version = "0.27", features = ["aio", "tokio-comp"] }
-serde = { version = "1.0", features = ["derive"] }
 futures = "0.3.32"
-lavende = { git = "https://github.com/waris4ly/lavende", branch = "dev" }
+harmony-cache = { version = "0.1.0", path = "../cache" }
