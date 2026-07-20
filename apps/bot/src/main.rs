@@ -60,10 +60,8 @@ async fn main() -> Result<(), HarmonyError> {
     info!("[POSTGRES] Migrations complete.");
 
     info!("[REDIS] Connecting to server: {}", sanitize_redis_url(&config.redis_url));
-    let redis_client =
-        redis::Client::open(config.redis_url.clone()).map_err(HarmonyError::Cache)?;
-    let cache =
-        redis_client.get_multiplexed_async_connection().await.map_err(HarmonyError::Cache)?;
+    let cache_client = harmony_cache::client::CacheClient::connect(&config.redis_url).await?;
+    let cache = cache_client.connection;
 
     let discord = Arc::new(DiscordClient::new(config.discord_token.clone()));
 
@@ -80,12 +78,15 @@ async fn main() -> Result<(), HarmonyError> {
         config.event_bus_capacity
     );
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(config.event_bus_capacity);
-    let redis_transport = Arc::new(RedisTransport::new(
-        &config.redis_url,
-        "harmony_events_worker",
-        "harmony_events_discord",
-        config.event_bus_capacity,
-    )?);
+    let redis_transport = Arc::new(
+        RedisTransport::new(
+            &config.redis_url,
+            "harmony_events_worker",
+            "harmony_events_discord",
+            config.event_bus_capacity,
+        )
+        .await?,
+    );
 
     let module_ctx = Arc::new(ModuleContext {
         db,

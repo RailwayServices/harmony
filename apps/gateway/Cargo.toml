@@ -11,14 +11,14 @@ harmony-messaging = { path = "../../crates/messaging" }
 tokio = { version = "1.52", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-appender = "0.2"
 dotenvy = "0.15"
 twilight-model = "0.17"
 twilight-http = { version = "0.17", default-features = false, features = ["simd-json", "rustls-native-roots"] }
 rustls = { version = "0.23", features = ["ring"] }
-lavende = { git = "https://github.com/waris4ly/lavende", branch = "dev" }
+lavende = "1.0.7"
 serde_json = "1.0.150"
 redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 dashmap = "6.0"
 twilight-util = { version = "0.17", features = ["builder"] }
 futures = "0.3"
+harmony-cache = { version = "0.1.0", path = "../../crates/cache" }

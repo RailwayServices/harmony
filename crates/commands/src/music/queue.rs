@@ -1,4 +1,5 @@
 use crate::core::interaction::InteractionContext;
+use crate::core::prefix::PrefixContext;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
@@ -129,6 +130,103 @@ pub async fn handle_queue(
             .color(0xFF0000)
             .build();
         let _ = interaction_ctx.edit_embed(embed, module_ctx).await;
+    }
+
+    Ok(())
+}
+
+pub async fn handle_prefix_queue(
+    ctx: &PrefixContext,
+    module_ctx: &ModuleContext,
+) -> Result<(), HarmonyError> {
+    let guild_id = ctx.guild_id.to_string();
+    let req_id = uuid::Uuid::new_v4().to_string();
+
+    let cmd = MusicCommand::Queue { guild_id: guild_id.clone(), req_id: req_id.clone() };
+
+    let payload = serde_json::to_string(&cmd).unwrap_or_default();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    if let Some(map) = MUSIC_RESPONSES.get() {
+        map.insert(req_id.clone(), tx);
+    } else {
+        return Err(HarmonyError::Internal("Music responses map not initialized".to_string()));
+    }
+
+    {
+        use redis::AsyncCommands;
+        let mut redis_conn = module_ctx.cache.clone();
+        let _: Result<(), _> = redis_conn.publish("harmony:music:requests", payload).await;
+    }
+
+    let response = match timeout(Duration::from_secs(5), rx).await {
+        Ok(Ok(res)) => res,
+        _ => {
+            if let Some(map) = MUSIC_RESPONSES.get() {
+                map.remove(&req_id);
+            }
+            let embed = EmbedBuilder::new()
+                .description("❌ Timeout waiting for queue.")
+                .color(0xFF0000)
+                .build();
+            let _ = ctx.reply_embed(embed, module_ctx).await;
+            return Ok(());
+        }
+    };
+
+    match response {
+        MusicResponse::QueueResult { tracks, .. } => {
+            if tracks.is_empty() {
+                let embed = EmbedBuilder::new()
+                    .description("📭 The queue is currently empty.")
+                    .color(module_ctx.embed_color)
+                    .build();
+                let _ = ctx.reply_embed(embed, module_ctx).await;
+            } else {
+                let mut content = String::new();
+                for (i, track) in tracks.iter().take(10).enumerate() {
+                    let title = if track.info.title.len() > 50 {
+                        format!("{}...", &track.info.title[0..47])
+                    } else {
+                        track.info.title.clone()
+                    };
+
+                    let dur_str = format!(
+                        "{:02}:{:02}",
+                        track.info.length / 60000,
+                        (track.info.length / 1000) % 60
+                    );
+
+                    content.push_str(&format!("`{}.` **{}** `[{}]`\n", i + 1, title, dur_str));
+                }
+
+                if tracks.len() > 10 {
+                    content.push_str(&format!("\n*...and {} more tracks*", tracks.len() - 10));
+                }
+
+                let embed = EmbedBuilder::new()
+                    .title("🎶 Current Queue")
+                    .description(content)
+                    .color(module_ctx.embed_color)
+                    .build();
+
+                let _ = ctx.reply_embed(embed, module_ctx).await;
+            }
+        }
+        MusicResponse::Error { message, .. } => {
+            let embed = EmbedBuilder::new()
+                .description(format!("❌ Could not fetch queue: {}", message))
+                .color(0xFF0000)
+                .build();
+            let _ = ctx.reply_embed(embed, module_ctx).await;
+        }
+        _ => {
+            let embed = EmbedBuilder::new()
+                .description("❌ Invalid response from audio node.")
+                .color(0xFF0000)
+                .build();
+            let _ = ctx.reply_embed(embed, module_ctx).await;
+        }
     }
 
     Ok(())

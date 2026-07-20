@@ -3,7 +3,12 @@
     "youtube": {
       "enabled": true,
       "clients": {
-        "search": ["TVHTML5_SIMPLY", "MUSIC_ANDROID", "ANDROID", "WEB"],
+        "search": [
+          "WEB_REMIX",
+          "MUSIC_ANDROID",
+          "ANDROID",
+          "WEB"
+        ],
         "playback": [
           "TV_CAST",
           "IOS",
@@ -105,7 +110,11 @@
     "buffer_duration_ms": 400,
     "frame_buffer_duration_ms": 3000,
     "mirrors": {
-      "providers": ["ytsearch:%ISRC%", "ytsearch:%QUERY%", "scsearch:%QUERY%"]
+      "providers": [
+        "ytmsearch:%ISRC%",
+        "ytmsearch:%QUERY%",
+        "scsearch:%QUERY%"
+      ]
     }
   }
 }

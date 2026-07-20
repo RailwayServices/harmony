@@ -23,6 +23,17 @@ impl PrefixContext {
         }
     }
 
+    pub async fn reply_embed(
+        &self,
+        embed: Embed,
+        _module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        match self.http.create_message(self.message.channel_id).embeds(&[embed]).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(HarmonyError::Internal(e.to_string())),
+        }
+    }
+
     pub async fn reply_with_ui(
         &self,
         embed: Embed,
@@ -108,8 +119,35 @@ impl PrefixRouter {
                 http: module_ctx.discord.clone(),
             };
 
-            if command.to_lowercase().as_str() == "ping" {
-                ctx.reply("Pong! 🏓").await?;
+            match command.to_lowercase().as_str() {
+                "ping" => {
+                    ctx.reply("Pong! 🏓").await?;
+                }
+                "play" | "p" => {
+                    let _ = crate::music::play::handle_prefix(&ctx, module_ctx).await;
+                }
+                "stop" => {
+                    let _ = crate::music::control::handle_prefix_stop(&ctx, module_ctx).await;
+                }
+                "skip" | "s" | "next" => {
+                    let _ = crate::music::control::handle_prefix_skip(&ctx, module_ctx).await;
+                }
+                "pause" => {
+                    let _ = crate::music::control::handle_prefix_pause(&ctx, module_ctx).await;
+                }
+                "resume" | "unpause" => {
+                    let _ = crate::music::control::handle_prefix_resume(&ctx, module_ctx).await;
+                }
+                "volume" | "vol" | "v" => {
+                    let _ = crate::music::control::handle_prefix_volume(&ctx, module_ctx).await;
+                }
+                "filter" => {
+                    let _ = crate::music::filter::handle_prefix_filter(&ctx, module_ctx).await;
+                }
+                "queue" | "q" => {
+                    let _ = crate::music::queue::handle_prefix_queue(&ctx, module_ctx).await;
+                }
+                _ => {}
             }
         }
 

@@ -20,17 +20,16 @@ impl MusicModule {
         let _ = IDLE_TIMERS.set(Arc::new(DashMap::new()));
 
         let ctx_clone = ctx.clone();
-        let redis_url_clone = redis_url.clone();
         tokio::spawn(async move {
-            let redis_client = match redis::Client::open(redis_url) {
+            let cache_client = match harmony_cache::client::CacheClient::connect(&redis_url).await {
                 Ok(c) => c,
                 Err(e) => {
-                    tracing::error!("Failed to open redis client for MusicModule responses: {}", e);
+                    tracing::error!("Failed to open cache client for MusicModule: {}", e);
                     return;
                 }
             };
 
-            let mut pubsub_conn = match redis_client.get_async_pubsub().await {
+            let mut pubsub_conn = match cache_client.client.get_async_pubsub().await {
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!("Failed to get pubsub conn for MusicModule responses: {}", e);
@@ -38,20 +37,7 @@ impl MusicModule {
                 }
             };
 
-            let mut redis_conn = match redis::Client::open(redis_url_clone) {
-                Ok(c) => match c.get_multiplexed_async_connection().await {
-                    Ok(conn) => conn,
-                    Err(e) => {
-                        tracing::error!("Failed to connect to redis for template: {}", e);
-                        return;
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("Failed to create redis client for template: {}", e);
-                    return;
-                }
-            };
-
+            let mut redis_conn = cache_client.connection;
             // Push template to Redis on startup
             let template = NowPlayingUiTemplate {
                 color: ctx_clone.embed_color,

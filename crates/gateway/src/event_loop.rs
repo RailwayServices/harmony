@@ -38,6 +38,8 @@ pub struct EventLoop<P: Publisher> {
     rx: tokio::sync::mpsc::Receiver<HarmonyEvent>,
     max_concurrent_tasks: usize,
     lavende_manager: Arc<LavendeManager>,
+    cache_client: harmony_cache::client::CacheClient,
+    bot_id: String,
 }
 
 impl<P: Publisher> EventLoop<P> {
@@ -47,8 +49,18 @@ impl<P: Publisher> EventLoop<P> {
         rx: tokio::sync::mpsc::Receiver<HarmonyEvent>,
         max_concurrent_tasks: usize,
         lavende_manager: Arc<LavendeManager>,
+        cache_client: harmony_cache::client::CacheClient,
+        bot_id: String,
     ) -> Self {
-        Self { shard_manager, dispatcher, rx, max_concurrent_tasks, lavende_manager }
+        Self {
+            shard_manager,
+            dispatcher,
+            rx,
+            max_concurrent_tasks,
+            lavende_manager,
+            cache_client,
+            bot_id,
+        }
     }
 }
 
@@ -67,11 +79,15 @@ impl<P: Publisher + 'static> EventLoop<P> {
 
         let shard_count = self.shard_manager.shards.len() as u64;
         let lavende_manager_shared = self.lavende_manager;
+        let redis_pool = self.cache_client.connection;
+        let bot_id = self.bot_id;
 
         for mut shard in self.shard_manager.shards {
             let dispatcher = Arc::clone(&dispatcher);
             let semaphore = Arc::clone(&semaphore);
             let lavende_manager = lavende_manager_shared.clone();
+            let mut redis_conn = redis_pool.clone();
+            let bot_id = bot_id.clone();
             join_set.spawn(async move {
                 let shard_id = shard.id();
                 info!("Starting event loop for shard {}", shard_id.number());
@@ -99,6 +115,29 @@ impl<P: Publisher + 'static> EventLoop<P> {
                                 ref vsu,
                             ) = event
                             {
+                                use redis::AsyncCommands;
+                                if let Some(channel_id) = vsu.0.channel_id {
+                                    let _: Result<(), _> = redis_conn
+                                        .hset(
+                                            "harmony:voice_states",
+                                            vsu.0.user_id.to_string(),
+                                            channel_id.to_string(),
+                                        )
+                                        .await;
+                                } else {
+                                    let _: Result<(), _> = redis_conn
+                                        .hdel("harmony:voice_states", vsu.0.user_id.to_string())
+                                        .await;
+                                        
+                                    if vsu.0.user_id.to_string() == bot_id {
+                                        if let Some(guild_id) = vsu.0.guild_id {
+                                            if let Some(player) = lavende_manager.get_player(&guild_id.to_string()) {
+                                                let _ = player.destroy(None).await;
+                                            }
+                                        }
+                                    }
+                                }
+
                                 let packet = serde_json::json!({
                                     "t": "VOICE_STATE_UPDATE",
                                     "d": {
@@ -116,6 +155,21 @@ impl<P: Publisher + 'static> EventLoop<P> {
                                 tokio::spawn(async move {
                                     manager.send_raw_data(&packet).await;
                                 });
+                            } else if let twilight_model::gateway::event::Event::GuildCreate(ref gc) = event {
+                                use redis::AsyncCommands;
+                                if let twilight_model::gateway::payload::incoming::GuildCreate::Available(guild) = gc.as_ref() {
+                                    for vs in &guild.voice_states {
+                                        if let Some(channel_id) = vs.channel_id {
+                                            let _: Result<(), _> = redis_conn
+                                                .hset(
+                                                    "harmony:voice_states",
+                                                    vs.user_id.to_string(),
+                                                    channel_id.to_string(),
+                                                )
+                                                .await;
+                                        }
+                                    }
+                                }
                             }
 
                             let harmony_event = HarmonyEvent::from(event);

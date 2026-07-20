@@ -16,13 +16,16 @@ impl AudioListener {
     }
 
     pub async fn run(self) {
-        let redis_client = match redis::Client::open(self.redis_url.clone()) {
+        let cache_client = match harmony_cache::client::CacheClient::connect(&self.redis_url).await
+        {
             Ok(c) => c,
             Err(e) => {
-                error!("Failed to open redis client for AudioListener: {}", e);
+                error!("Failed to connect cache client for AudioListener: {}", e);
                 return;
             }
         };
+
+        let redis_client = cache_client.client;
 
         let mut pubsub_conn = match redis_client.get_async_pubsub().await {
             Ok(c) => c,
@@ -84,10 +87,9 @@ impl AudioListener {
         match command {
             MusicCommand::Play { req_id, guild_id, channel_id, text_channel_id, query } => {
                 let player = manager.get_or_create_player(&guild_id);
-                player.set_receive_voice(true);
 
                 let ((), search_result) = tokio::join!(
-                    player.connect(Some(channel_id), false, false),
+                    player.connect(Some(channel_id), false, true),
                     player.search(&query)
                 );
 
