@@ -52,7 +52,15 @@ impl<P: Publisher> EventLoop<P> {
         cache_client: harmony_cache::client::CacheClient,
         bot_id: String,
     ) -> Self {
-        Self { shard_manager, dispatcher, rx, max_concurrent_tasks, lavende_manager, cache_client, bot_id }
+        Self {
+            shard_manager,
+            dispatcher,
+            rx,
+            max_concurrent_tasks,
+            lavende_manager,
+            cache_client,
+            bot_id,
+        }
     }
 }
 

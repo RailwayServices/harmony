@@ -78,12 +78,15 @@ async fn main() -> Result<(), HarmonyError> {
         config.event_bus_capacity
     );
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(config.event_bus_capacity);
-    let redis_transport = Arc::new(RedisTransport::new(
-        &config.redis_url,
-        "harmony_events_worker",
-        "harmony_events_discord",
-        config.event_bus_capacity,
-    ).await?);
+    let redis_transport = Arc::new(
+        RedisTransport::new(
+            &config.redis_url,
+            "harmony_events_worker",
+            "harmony_events_discord",
+            config.event_bus_capacity,
+        )
+        .await?,
+    );
 
     let module_ctx = Arc::new(ModuleContext {
         db,

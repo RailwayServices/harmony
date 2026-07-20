@@ -33,7 +33,8 @@ async fn main() -> Result<(), HarmonyError> {
         "harmony_events_discord",
         "harmony_events_worker",
         config.event_bus_capacity,
-    ).await?;
+    )
+    .await?;
 
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(config.event_bus_capacity);
     let mut redis_rx = redis_transport.subscribe().await?;
@@ -94,7 +95,9 @@ async fn main() -> Result<(), HarmonyError> {
     let discord_clone = discord.clone();
 
     tokio::spawn(async move {
-        if let Ok(cache_client) = harmony_cache::client::CacheClient::connect(&redis_url_clone).await {
+        if let Ok(cache_client) =
+            harmony_cache::client::CacheClient::connect(&redis_url_clone).await
+        {
             let mut con = cache_client.connection;
             use harmony_common::music_ipc::NowPlayingUiTemplate;
             use redis::AsyncCommands;
@@ -230,7 +233,8 @@ async fn main() -> Result<(), HarmonyError> {
     let redis_url_interactions = config.redis_url.clone();
     let lavende_interactions = lavende_manager.clone();
     tokio::spawn(async move {
-        if let Ok(cache_client) = harmony_cache::client::CacheClient::connect(&redis_url_interactions).await
+        if let Ok(cache_client) =
+            harmony_cache::client::CacheClient::connect(&redis_url_interactions).await
             && let Ok(mut pubsub) = cache_client.client.get_async_pubsub().await
         {
             let _ = pubsub.subscribe("harmony_events_discord").await;

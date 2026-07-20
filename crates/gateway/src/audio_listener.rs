@@ -16,14 +16,15 @@ impl AudioListener {
     }
 
     pub async fn run(self) {
-        let cache_client = match harmony_cache::client::CacheClient::connect(&self.redis_url).await {
+        let cache_client = match harmony_cache::client::CacheClient::connect(&self.redis_url).await
+        {
             Ok(c) => c,
             Err(e) => {
                 error!("Failed to connect cache client for AudioListener: {}", e);
                 return;
             }
         };
-        
+
         let redis_client = cache_client.client;
 
         let mut pubsub_conn = match redis_client.get_async_pubsub().await {
