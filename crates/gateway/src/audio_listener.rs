@@ -88,10 +88,79 @@ impl AudioListener {
             MusicCommand::Play { req_id, guild_id, channel_id, text_channel_id, query } => {
                 let player = manager.get_or_create_player(&guild_id);
 
-                let ((), search_result) = tokio::join!(
-                    player.connect(Some(channel_id), false, true),
-                    player.search(&query)
-                );
+                let is_plain_search = !query.starts_with("http") && !query.contains(':');
+
+                let ((), search_result) =
+                    tokio::join!(player.connect(Some(channel_id), false, true), async {
+                        if is_plain_search {
+                            // Fire all 3 searches in parallel
+                            let dz_query = format!("dzsearch:{}", query);
+                            let saavn_query = format!("saavnsearch:{}", query);
+                            let ytm_query = format!("ytmsearch:{}", query);
+
+                            let dz_fut = player.search(&dz_query);
+                            let saavn_fut = player.search(&saavn_query);
+                            let ytm_fut = player.search(&ytm_query);
+
+                            tokio::pin!(dz_fut, saavn_fut, ytm_fut);
+
+                            let is_valid = |r: &Result<lavende::LoadResult, String>| -> bool {
+                                matches!(
+                                    r,
+                                    Ok(lavende::LoadResult::Track(_))
+                                        | Ok(lavende::LoadResult::Search(_))
+                                        | Ok(lavende::LoadResult::Playlist(_))
+                                )
+                            };
+
+                            let mut dz_res: Option<Result<lavende::LoadResult, String>> = None;
+                            let mut saavn_res: Option<Result<lavende::LoadResult, String>> = None;
+                            let mut ytm_res: Option<Result<lavende::LoadResult, String>> = None;
+                            let mut pending = 3;
+
+                            loop {
+                                tokio::select! {
+                                    res = &mut dz_fut, if dz_res.is_none() => {
+                                        if is_valid(&res) {
+                                            break res;
+                                        }
+                                        dz_res = Some(res);
+                                        pending -= 1;
+                                    }
+                                    res = &mut saavn_fut, if saavn_res.is_none() => {
+                                        if is_valid(&res) {
+                                            break res;
+                                        }
+                                        saavn_res = Some(res);
+                                        pending -= 1;
+                                    }
+                                    res = &mut ytm_fut, if ytm_res.is_none() => {
+                                        if is_valid(&res) {
+                                            break res;
+                                        }
+                                        ytm_res = Some(res);
+                                        pending -= 1;
+                                    }
+                                }
+
+                                if pending == 0 {
+                                    if let Some(r) = dz_res.take() {
+                                        break r;
+                                    }
+                                    if let Some(r) = saavn_res.take() {
+                                        break r;
+                                    }
+                                    if let Some(r) = ytm_res.take() {
+                                        break r;
+                                    }
+                                    break Err("All searches failed".to_string());
+                                }
+                            }
+                        } else {
+                            // Direct URL or prefixed query → pass as-is
+                            player.search(&query).await
+                        }
+                    });
 
                 let response = match search_result {
                     Ok(result) => {

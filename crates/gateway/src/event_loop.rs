@@ -128,13 +128,12 @@ impl<P: Publisher + 'static> EventLoop<P> {
                                     let _: Result<(), _> = redis_conn
                                         .hdel("harmony:voice_states", vsu.0.user_id.to_string())
                                         .await;
-                                        
-                                    if vsu.0.user_id.to_string() == bot_id {
-                                        if let Some(guild_id) = vsu.0.guild_id {
-                                            if let Some(player) = lavende_manager.get_player(&guild_id.to_string()) {
-                                                let _ = player.destroy(None).await;
-                                            }
-                                        }
+
+                                    if vsu.0.user_id.to_string() == bot_id
+                                        && let Some(guild_id) = vsu.0.guild_id
+                                        && let Some(player) = lavende_manager.get_player(&guild_id.to_string())
+                                    {
+                                        let _ = player.destroy(None).await;
                                     }
                                 }
 

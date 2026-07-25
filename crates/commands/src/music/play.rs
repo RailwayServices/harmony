@@ -12,6 +12,8 @@ pub async fn handle(
     interaction_ctx: &InteractionContext,
     module_ctx: &ModuleContext,
 ) -> Result<(), HarmonyError> {
+    interaction_ctx.defer(module_ctx).await?;
+
     let guild_id = interaction_ctx
         .guild_id
         .ok_or_else(|| HarmonyError::Internal("Command must be run in a guild".to_string()))?;
@@ -27,7 +29,7 @@ pub async fn handle(
             .description("❌ Please provide a search query or URL.")
             .color(0xFF0000)
             .build();
-        return interaction_ctx.reply_embed(embed, module_ctx).await;
+        return interaction_ctx.edit_embed(embed, module_ctx).await;
     }
 
     if query.len() > 500 {
@@ -35,21 +37,21 @@ pub async fn handle(
             .description("❌ Query too long! Maximum 500 characters.")
             .color(0xFF0000)
             .build();
-        return interaction_ctx.reply_embed(embed, module_ctx).await;
+        return interaction_ctx.edit_embed(embed, module_ctx).await;
     }
 
     if query.starts_with("http") {
         if !query.starts_with("https://") && !query.starts_with("http://") {
             let embed =
                 EmbedBuilder::new().description("❌ Invalid URL format!").color(0xFF0000).build();
-            return interaction_ctx.reply_embed(embed, module_ctx).await;
+            return interaction_ctx.edit_embed(embed, module_ctx).await;
         }
         if query.contains("localhost") || query.contains("127.0.0.1") || query.contains("0.0.0.0") {
             let embed = EmbedBuilder::new()
                 .description("❌ Cannot play from local URLs!")
                 .color(0xFF0000)
                 .build();
-            return interaction_ctx.reply_embed(embed, module_ctx).await;
+            return interaction_ctx.edit_embed(embed, module_ctx).await;
         }
     }
 
@@ -66,15 +68,14 @@ pub async fn handle(
                     .description("❌ You must be in a voice channel!")
                     .color(0xFF0000)
                     .build();
-                return interaction_ctx.reply_embed(embed, module_ctx).await;
+                return interaction_ctx.edit_embed(embed, module_ctx).await;
             }
         }
     };
 
-    interaction_ctx.defer(module_ctx).await?;
+    // Defer is already called at the top
 
-    let search_query =
-        if query.starts_with("http") { query.clone() } else { format!("ytsearch:{}", query) };
+    let search_query = query.clone();
 
     let req_id = uuid::Uuid::new_v4().to_string();
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -247,8 +248,7 @@ pub async fn handle_prefix(
         }
     };
 
-    let search_query =
-        if query.starts_with("http") { query.clone() } else { format!("ytsearch:{}", query) };
+    let search_query = query.clone();
 
     let req_id = uuid::Uuid::new_v4().to_string();
     let (tx, rx) = tokio::sync::oneshot::channel();
