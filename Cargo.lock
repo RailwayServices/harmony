@@ -1322,6 +1322,7 @@ dependencies = [
  "harmony-gateway",
  "harmony-messaging",
  "lavende",
+ "lavende-core",
  "redis",
  "rustls 0.23.42",
  "serde_json",
@@ -1936,9 +1937,9 @@ dependencies = [
 
 [[package]]
 name = "lavende"
-version = "1.0.7"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ab9d0326203ce0982d4d2468c595d53cc041124c5564746c943a25d3a96437"
+checksum = "45c2f91663dbe0fb5a9ce75158e3992f843129f248793ed4509d898c99ca978f"
 dependencies = [
  "async-trait",
  "dashmap 6.2.1",
@@ -1953,9 +1954,9 @@ dependencies = [
 
 [[package]]
 name = "lavende-core"
-version = "0.1.17"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7eb12271e0dc9dee04428f30ecf7696df0c1329914dbd02289fdb6419f1ab0"
+checksum = "8823a8b411568aaf85f4fb415232707485a6256df7bd71b79e0c69b5ebd53355"
 dependencies = [
  "aes",
  "async-trait",

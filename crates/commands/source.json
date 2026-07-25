@@ -4,7 +4,7 @@
       "enabled": true,
       "clients": {
         "search": [
-          "WEB_REMIX",
+          "TVHTML5_SIMPLY",
           "MUSIC_ANDROID",
           "ANDROID",
           "WEB"
@@ -75,7 +75,9 @@
       "album_page_load_concurrency": 5
     },
     "deezer": {
-      "enabled": true
+      "enabled": true,
+      "master_decryption_key": "g4el58wc0zvf9na1",
+      "arls": ["5071ab4059db0f7963eac80d93d62c5c015ca0685722800dae40a133870f5cad8d105331055373c9a45adecafd351c0e4bb17860f67aa2c8e6a22c04dabe66bd8674b70c7c9f815e926719723b164834fc2d3e2062649623d0b699f42f37910d"]
     },
     "http": {
       "enabled": true
@@ -111,9 +113,11 @@
     "frame_buffer_duration_ms": 3000,
     "mirrors": {
       "providers": [
-        "ytmsearch:%ISRC%",
-        "ytmsearch:%QUERY%",
-        "scsearch:%QUERY%"
+        "dzsearch:%QUERY%",
+        "saavnsearch:%QUERY%",
+        "scsearch:%QUERY%",
+        "ytsearch:%ISRC%",
+        "ytsearch:%QUERY%"
       ]
     }
   }

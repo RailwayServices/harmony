@@ -80,7 +80,15 @@ async fn main() -> Result<(), HarmonyError> {
             let _ = event_tx_clone.try_send(event);
         }
     };
+    lavende_core::set_config_path(Some("./crates/commands/source.json".to_string()));
     let lavende_manager = Arc::new(LavendeManager::new(client_id.clone(), send_to_shard_fn));
+
+    info!("[GATEWAY] Eagerly initializing Lavende sources in background...");
+    let init_manager = lavende_manager.clone();
+    tokio::spawn(async move {
+        let dummy = init_manager.get_or_create_player("init_dummy");
+        let _ = dummy.search("ytsearch:init").await;
+    });
 
     let audio_listener = harmony_gateway::audio_listener::AudioListener::new(
         lavende_manager.clone(),
