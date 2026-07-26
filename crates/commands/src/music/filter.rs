@@ -1,30 +1,102 @@
 use crate::core::interaction::InteractionContext;
 use crate::core::prefix::PrefixContext;
+use crate::core::traits::{AppCommand, PrefixCommand};
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::MusicCommand;
 use redis::AsyncCommands;
+use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
+use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
+
+#[derive(CommandOption, CreateOption)]
+pub enum FilterType {
+    #[option(name = "Bassboost", value = "bassboost")]
+    Bassboost,
+    #[option(name = "Nightcore", value = "nightcore")]
+    Nightcore,
+    #[option(name = "Vaporwave", value = "vaporwave")]
+    Vaporwave,
+    #[option(name = "8D", value = "8d")]
+    EightD,
+    #[option(name = "Studio (HQ)", value = "studio")]
+    Studio,
+    #[option(name = "Tremolo", value = "tremolo")]
+    Tremolo,
+    #[option(name = "Vibrato", value = "vibrato")]
+    Vibrato,
+    #[option(name = "Clear", value = "clear")]
+    Clear,
+}
+
+impl FilterType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Bassboost => "bassboost",
+            Self::Nightcore => "nightcore",
+            Self::Vaporwave => "vaporwave",
+            Self::EightD => "8d",
+            Self::Studio => "studio",
+            Self::Tremolo => "tremolo",
+            Self::Vibrato => "vibrato",
+            Self::Clear => "clear",
+        }
+    }
+}
+
+#[derive(CommandModel, CreateCommand)]
+#[command(name = "filter", desc = "Apply an audio filter")]
+pub struct FilterCommand {
+    #[command(rename = "type", desc = "The filter to apply")]
+    pub r#type: FilterType,
+}
+
+pub struct FilterAppCommand;
+#[async_trait::async_trait]
+impl AppCommand for FilterAppCommand {
+    fn name(&self) -> &'static str {
+        "filter"
+    }
+    fn register(&self) -> twilight_model::application::command::Command {
+        FilterCommand::create_command().into()
+    }
+    async fn handle(
+        &self,
+        ctx: &InteractionContext,
+        data: &CommandData,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        let cmd = FilterCommand::from_interaction(data.clone().into())
+            .map_err(|e| HarmonyError::Internal(e.to_string()))?;
+        handle_filter(ctx, cmd, module_ctx).await
+    }
+}
+
+pub struct FilterPrefixCommand;
+#[async_trait::async_trait]
+impl PrefixCommand for FilterPrefixCommand {
+    fn aliases(&self) -> Vec<&'static str> {
+        vec!["filter"]
+    }
+    async fn handle(
+        &self,
+        ctx: &PrefixContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        handle_prefix_filter(ctx, module_ctx).await
+    }
+}
 
 pub async fn handle_filter(
     interaction_ctx: &InteractionContext,
+    cmd: FilterCommand,
     module_ctx: &ModuleContext,
 ) -> Result<(), HarmonyError> {
     let guild_id = interaction_ctx
         .guild_id
         .ok_or_else(|| HarmonyError::Internal("Command must be run in a guild".to_string()))?;
 
-    let filter_type = interaction_ctx.extract_string_option("type").unwrap_or_default();
-
-    let valid_filters =
-        ["bassboost", "nightcore", "vaporwave", "studio", "8d", "tremolo", "vibrato", "clear"];
-
-    if !valid_filters.contains(&filter_type.as_str()) {
-        let embed =
-            EmbedBuilder::new().description("❌ Unknown filter type.").color(0xFF0000).build();
-        let _ = interaction_ctx.reply_embed(embed, module_ctx).await;
-        return Ok(());
-    }
+    let filter_type = cmd.r#type.as_str().to_string();
 
     let cmd =
         MusicCommand::Filter { guild_id: guild_id.to_string(), filter_type: filter_type.clone() };

@@ -16,4 +16,6 @@ lavende = "1.0.10"
 uuid = { version = "1.23.4", features = ["v4"] }
 redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 harmony-cache = { version = "0.1.0", path = "../cache" }
+twilight-interactions = { version = "0.17.1", features = ["derive"] }
+async-trait = "0.1"
 

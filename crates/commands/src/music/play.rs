@@ -1,15 +1,65 @@
 use crate::core::interaction::InteractionContext;
 use crate::core::prefix::PrefixContext;
+use crate::core::traits::{AppCommand, PrefixCommand};
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
 use harmony_modules::MUSIC_RESPONSES;
 use lavende::LoadResult;
-use tokio::time::{Duration, timeout};
+use std::time::Duration;
+use tokio::time::timeout;
+use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
-pub async fn handle(
+#[derive(CommandModel, CreateCommand)]
+#[command(name = "play", desc = "Play a song from YouTube/Spotify")]
+pub struct PlayCommand {
+    #[command(desc = "The song name or URL to play")]
+    pub query: String,
+}
+
+pub struct PlayAppCommand;
+
+#[async_trait::async_trait]
+impl AppCommand for PlayAppCommand {
+    fn name(&self) -> &'static str {
+        "play"
+    }
+    fn register(&self) -> twilight_model::application::command::Command {
+        PlayCommand::create_command().into()
+    }
+    async fn handle(
+        &self,
+        interaction_ctx: &InteractionContext,
+        data: &CommandData,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        let cmd = PlayCommand::from_interaction(data.clone().into())
+            .map_err(|e| HarmonyError::Internal(e.to_string()))?;
+        handle_play_slash(interaction_ctx, cmd, module_ctx).await
+    }
+}
+
+pub struct PlayPrefixCommand;
+
+#[async_trait::async_trait]
+impl PrefixCommand for PlayPrefixCommand {
+    fn aliases(&self) -> Vec<&'static str> {
+        vec!["play", "p"]
+    }
+    async fn handle(
+        &self,
+        ctx: &PrefixContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        handle_prefix(ctx, module_ctx).await
+    }
+}
+
+pub async fn handle_play_slash(
     interaction_ctx: &InteractionContext,
+    cmd: PlayCommand,
     module_ctx: &ModuleContext,
 ) -> Result<(), HarmonyError> {
     interaction_ctx.defer(module_ctx).await?;
@@ -22,7 +72,7 @@ pub async fn handle(
         .user_id
         .ok_or_else(|| HarmonyError::Internal("Could not extract user id".to_string()))?;
 
-    let query = interaction_ctx.extract_string_option("query").unwrap_or_default();
+    let query = cmd.query;
 
     if query.is_empty() {
         let embed = EmbedBuilder::new()

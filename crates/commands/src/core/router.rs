@@ -3,13 +3,47 @@ use crate::core::prefix::PrefixRouter;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 
+use crate::core::traits::AppCommand;
+use std::collections::HashMap;
+
 pub struct CommandRouter {
     prefix_router: PrefixRouter,
+    slash_commands: HashMap<&'static str, Box<dyn AppCommand>>,
 }
 
 impl CommandRouter {
     pub fn new(prefix: String) -> Self {
-        Self { prefix_router: PrefixRouter::new(prefix) }
+        let mut slash_commands: HashMap<&'static str, Box<dyn AppCommand>> = HashMap::new();
+
+        let play = Box::new(crate::music::play::PlayAppCommand);
+        slash_commands.insert(play.name(), play);
+
+        let stop = Box::new(crate::music::control::StopAppCommand);
+        slash_commands.insert(stop.name(), stop);
+
+        let skip = Box::new(crate::music::control::SkipAppCommand);
+        slash_commands.insert(skip.name(), skip);
+
+        let pause = Box::new(crate::music::control::PauseAppCommand);
+        slash_commands.insert(pause.name(), pause);
+
+        let resume = Box::new(crate::music::control::ResumeAppCommand);
+        slash_commands.insert(resume.name(), resume);
+
+        let volume = Box::new(crate::music::control::VolumeAppCommand);
+        slash_commands.insert(volume.name(), volume);
+
+        let filter = Box::new(crate::music::filter::FilterAppCommand);
+        slash_commands.insert(filter.name(), filter);
+
+        let queue = Box::new(crate::music::queue::QueueAppCommand);
+        slash_commands.insert(queue.name(), queue);
+
+        Self { prefix_router: PrefixRouter::new(prefix), slash_commands }
+    }
+
+    pub fn get_commands(&self) -> Vec<twilight_model::application::command::Command> {
+        self.slash_commands.values().map(|cmd| cmd.register()).collect()
     }
 
     pub async fn handle_event(
@@ -44,19 +78,18 @@ impl CommandRouter {
 
         let name = interaction_ctx.extract_command_name()?;
 
-        match name {
-            "play" => crate::music::play::handle(interaction_ctx, module_ctx).await,
-            "stop" => crate::music::control::handle_stop(interaction_ctx, module_ctx).await,
-            "skip" => crate::music::control::handle_skip(interaction_ctx, module_ctx).await,
-            "pause" => crate::music::control::handle_pause(interaction_ctx, module_ctx).await,
-            "resume" => crate::music::control::handle_resume(interaction_ctx, module_ctx).await,
-            "volume" => crate::music::control::handle_volume(interaction_ctx, module_ctx).await,
-            "filter" => crate::music::filter::handle_filter(interaction_ctx, module_ctx).await,
-            "queue" => crate::music::queue::handle_queue(interaction_ctx, module_ctx).await,
-            other => {
-                tracing::debug!("Received unknown command '{}', ignoring.", other);
-                Ok(())
-            }
+        let data = match &interaction_ctx.interaction.data {
+            Some(
+                twilight_model::application::interaction::InteractionData::ApplicationCommand(data),
+            ) => data,
+            _ => return Err(HarmonyError::Internal("Missing command data".to_string())),
+        };
+
+        if let Some(cmd) = self.slash_commands.get(name) {
+            cmd.handle(interaction_ctx, data.as_ref(), module_ctx).await
+        } else {
+            tracing::debug!("Received unknown command '{}', ignoring.", name);
+            Ok(())
         }
     }
 
