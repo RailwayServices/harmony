@@ -1,11 +1,52 @@
 use crate::core::interaction::InteractionContext;
 use crate::core::prefix::PrefixContext;
+use crate::core::traits::{AppCommand, PrefixCommand};
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
 use harmony_common::music_ipc::{MusicCommand, MusicResponse};
 use harmony_modules::MUSIC_RESPONSES;
 use tokio::time::{Duration, timeout};
+use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
+
+#[derive(CommandModel, CreateCommand)]
+#[command(name = "queue", desc = "View the current queue")]
+pub struct QueueCommand {}
+
+pub struct QueueAppCommand;
+#[async_trait::async_trait]
+impl AppCommand for QueueAppCommand {
+    fn name(&self) -> &'static str {
+        "queue"
+    }
+    fn register(&self) -> twilight_model::application::command::Command {
+        QueueCommand::create_command().into()
+    }
+    async fn handle(
+        &self,
+        ctx: &InteractionContext,
+        _data: &CommandData,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        handle_queue(ctx, module_ctx).await
+    }
+}
+
+pub struct QueuePrefixCommand;
+#[async_trait::async_trait]
+impl PrefixCommand for QueuePrefixCommand {
+    fn aliases(&self) -> Vec<&'static str> {
+        vec!["queue", "q"]
+    }
+    async fn handle(
+        &self,
+        ctx: &PrefixContext,
+        module_ctx: &ModuleContext,
+    ) -> Result<(), HarmonyError> {
+        handle_prefix_queue(ctx, module_ctx).await
+    }
+}
 
 fn format_duration(ms: u64) -> String {
     let seconds = ms / 1000;

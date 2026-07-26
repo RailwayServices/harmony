@@ -1253,6 +1253,7 @@ dependencies = [
 name = "harmony-commands"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "harmony-cache",
  "harmony-common",
  "harmony-modules",
@@ -1262,6 +1263,7 @@ dependencies = [
  "tokio",
  "tracing",
  "twilight-http",
+ "twilight-interactions",
  "twilight-model",
  "twilight-util",
  "uuid",
@@ -4603,6 +4605,27 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "twilight-interactions"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7aa45cfc23909552f48b91d44b4bb61f10d8753a493c7bd98a6e12abd4814909"
+dependencies = [
+ "twilight-interactions-derive",
+ "twilight-model",
+]
+
+[[package]]
+name = "twilight-interactions-derive"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd867d65571c9d9e688f14b598ec5323eb6536b94981a6cbfad0fc5fbd26eaa3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

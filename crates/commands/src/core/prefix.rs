@@ -1,5 +1,7 @@
+use crate::core::traits::PrefixCommand;
 use harmony_common::error::HarmonyError;
 use harmony_common::module::ModuleContext;
+use std::collections::HashMap;
 use std::sync::Arc;
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::Message;
@@ -54,11 +56,54 @@ impl PrefixContext {
 
 pub struct PrefixRouter {
     prefix: String,
+    commands: HashMap<&'static str, Arc<dyn PrefixCommand>>,
 }
 
 impl PrefixRouter {
     pub fn new(prefix: String) -> Self {
-        Self { prefix }
+        let mut commands: HashMap<&'static str, Arc<dyn PrefixCommand>> = HashMap::new();
+
+        let play: Arc<dyn PrefixCommand> = Arc::new(crate::music::play::PlayPrefixCommand);
+        for alias in play.aliases() {
+            commands.insert(alias, play.clone());
+        }
+
+        let stop: Arc<dyn PrefixCommand> = Arc::new(crate::music::control::StopPrefixCommand);
+        for alias in stop.aliases() {
+            commands.insert(alias, stop.clone());
+        }
+
+        let skip: Arc<dyn PrefixCommand> = Arc::new(crate::music::control::SkipPrefixCommand);
+        for alias in skip.aliases() {
+            commands.insert(alias, skip.clone());
+        }
+
+        let pause: Arc<dyn PrefixCommand> = Arc::new(crate::music::control::PausePrefixCommand);
+        for alias in pause.aliases() {
+            commands.insert(alias, pause.clone());
+        }
+
+        let resume: Arc<dyn PrefixCommand> = Arc::new(crate::music::control::ResumePrefixCommand);
+        for alias in resume.aliases() {
+            commands.insert(alias, resume.clone());
+        }
+
+        let vol: Arc<dyn PrefixCommand> = Arc::new(crate::music::control::VolumePrefixCommand);
+        for alias in vol.aliases() {
+            commands.insert(alias, vol.clone());
+        }
+
+        let filter: Arc<dyn PrefixCommand> = Arc::new(crate::music::filter::FilterPrefixCommand);
+        for alias in filter.aliases() {
+            commands.insert(alias, filter.clone());
+        }
+
+        let queue: Arc<dyn PrefixCommand> = Arc::new(crate::music::queue::QueuePrefixCommand);
+        for alias in queue.aliases() {
+            commands.insert(alias, queue.clone());
+        }
+
+        Self { prefix, commands }
     }
 
     pub fn parse_prefix<'a>(&self, content: &'a str) -> Option<(&'a str, &'a str)> {
@@ -119,35 +164,11 @@ impl PrefixRouter {
                 http: module_ctx.discord.clone(),
             };
 
-            match command.to_lowercase().as_str() {
-                "ping" => {
-                    ctx.reply("Pong! 🏓").await?;
-                }
-                "play" | "p" => {
-                    let _ = crate::music::play::handle_prefix(&ctx, module_ctx).await;
-                }
-                "stop" => {
-                    let _ = crate::music::control::handle_prefix_stop(&ctx, module_ctx).await;
-                }
-                "skip" | "s" | "next" => {
-                    let _ = crate::music::control::handle_prefix_skip(&ctx, module_ctx).await;
-                }
-                "pause" => {
-                    let _ = crate::music::control::handle_prefix_pause(&ctx, module_ctx).await;
-                }
-                "resume" | "unpause" => {
-                    let _ = crate::music::control::handle_prefix_resume(&ctx, module_ctx).await;
-                }
-                "volume" | "vol" | "v" => {
-                    let _ = crate::music::control::handle_prefix_volume(&ctx, module_ctx).await;
-                }
-                "filter" => {
-                    let _ = crate::music::filter::handle_prefix_filter(&ctx, module_ctx).await;
-                }
-                "queue" | "q" => {
-                    let _ = crate::music::queue::handle_prefix_queue(&ctx, module_ctx).await;
-                }
-                _ => {}
+            let command_lower = command.to_lowercase();
+            if let Some(cmd) = self.commands.get(command_lower.as_str()) {
+                let _ = cmd.handle(&ctx, module_ctx).await;
+            } else if command_lower == "ping" {
+                ctx.reply("Pong! 🏓").await?;
             }
         }
 
